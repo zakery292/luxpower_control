@@ -1,7 +1,7 @@
 import sqlite3
 
 DATABASE_FILENAME = "soc_database.db"
-
+print("Creating database with file name " + DATABASE_FILENAME)
 conn = sqlite3.connect(DATABASE_FILENAME)
 cursor = conn.cursor()
 
@@ -23,3 +23,4 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS grid_data (
 
 conn.commit()
 conn.close()
+print(f"Database created with the file name {DATABASE_FILENAME}")
