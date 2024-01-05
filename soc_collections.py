@@ -85,26 +85,27 @@ def on_log(client, userdata, level, buf):
     print("Log: ", buf)
 
 
-# Set up MQTT client
-client = mqtt.Client()
-client.on_connect = on_connect
-client.on_message = on_message
-client.on_disconnect = on_disconnect
-client.on_log = on_log
-
-# Set MQTT username and password (replace with your credentials)
+# Set MQTT username and password from environment variables
 mqtt_username = os.getenv('MQTT_USER', 'default_user')
 mqtt_password = os.getenv('MQTT_PASSWORD', 'default_password')
 mqtt_host = os.getenv('MQTT_HOST', '192.168.1.135')
 mqtt_port = int(os.getenv('MQTT_PORT', 1883))
 
-# Connect to MQTT broker (update with your broker's IP address and port)
+# Set up MQTT client
+client = mqtt.Client()
+client.username_pw_set(mqtt_username, password=mqtt_password)  # Set username and password
+client.on_connect = on_connect
+client.on_message = on_message
+client.on_disconnect = on_disconnect
+client.on_log = on_log
+print(f'Conneting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_username} and password {mqtt_password}')
+print('This is from soc_collections.py')
+# Connect to MQTT broker
 try:
-    client.connect("192.168.1.135", 1883, 60)
+    client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
     print(f"Failed to connect to MQTT broker: {e}")
     exit(1)
 
-# Loop forever, processing received messages
-print("Starting MQTT loop...")
+# Start the loop
 client.loop_forever()
