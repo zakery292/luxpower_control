@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 
 ENV PYTHONUNBUFFERED=1
-COPY . .
+COPY start.sh /
 # Install required Python packages
 RUN pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
 # Make the start.sh script executable
