@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /opt/
 ENV PYTHONUNBUFFERED=1
-COPY soc_collections.py predict_soc.py init_db.py start.sh ./
+COPY soc_collections.py predict_soc.py init_db.py run.sh ./
 # Install required Python packages
 RUN pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
 # Make the start.sh script executable
