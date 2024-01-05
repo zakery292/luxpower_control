@@ -13,4 +13,4 @@ COPY soc_collections.py predict_soc.py init_db.py start.sh /usr/src/app/
 RUN chmod a+x start.sh
 
 # Run the start.sh script when the container starts
-CMD ["./start.sh"]
+CMD ["/start.sh"]
