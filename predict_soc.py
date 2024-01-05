@@ -187,13 +187,18 @@ def on_message(client, userdata, msg):
     if target_date:
         predictions = predict_soc_for_day(target_date)
         client.publish("battery_soc/response", json.dumps(predictions))
+def on_disconnect(client, userdata, rc):
+    print("Disconnected with result code " + str(rc))
 
+
+def on_log(client, userdata, level, buf):
+    print("Log: ", buf)
 
 # Set MQTT username and password from environment variables
-mqtt_username = os.getenv('MQTT_USER', 'default_user')
-mqtt_password = os.getenv('MQTT_PASSWORD', 'default_password')
-mqtt_host = os.getenv('MQTT_HOST', '192.168.1.135')
-mqtt_port = int(os.getenv('MQTT_PORT', 1883))
+mqtt_username = os.getenv('mqtt_user', 'default_user')
+mqtt_password = os.getenv('mqtt_password', 'default_password')
+mqtt_host = os.getenv('mqtt_host', '192.168.1.135')
+mqtt_port = int(os.getenv('mqtt_port', 1883))
 
 # Set up MQTT client
 client = mqtt.Client()
