@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bashio
 
 # Logging configuration and script start
 echo "Starting LuxPower Control & DB Add-on..."
