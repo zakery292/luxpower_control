@@ -1,0 +1,7 @@
+{
+    "mqtt_host": "192.168.1.135",
+    "mqtt_port": 1883,
+    "mqtt_user": "hass",
+    "mqtt_password": "password"
+  }
+  
