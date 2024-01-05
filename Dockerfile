@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
 COPY soc_collections.py predict_soc.py init_db.py start.sh /usr/src/app/
 
 # Make the start.sh script executable
-RUN chmod a+x start.sh
+RUN chmod a+x /start.sh
 
 # Run the start.sh script when the container starts
 CMD ["/start.sh"]
