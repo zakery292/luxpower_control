@@ -111,59 +111,53 @@ def train_model(df):
     return model
 
 
-def predict_soc_for_day(start_date, end_date):
+def predict_soc_for_day(start_date, end_date, df_rates):
     print("predict_soc_for_day called with start_date:", start_date, "end_date:", end_date)
     df = get_soc_data2()
     model = train_model(df)
-
-    # Define the night cost threshold
-    night_cost_threshold = 20.00  # Example value, adjust as needed
-    min_soc_threshold = 10  # Minimum SOC to prevent full discharge
 
     # Convert start and end dates to datetime objects
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
     predictions = {}
+    actions = {}
+    min_soc_threshold = 10  # Minimum SOC to prevent full discharge
+    charge_cost_threshold = 20.00  # Cost threshold for charging
+
     current_time = start_timestamp
     while current_time < end_timestamp:
         matching_data = df[df["timestamp"] == pd.Timestamp(current_time)]
 
         if not matching_data.empty:
             row = matching_data.iloc[0]
+            # Get the cost for the current timestamp from df_rates
+            current_rate = df_rates[(df_rates['timestamp'] >= current_time) & (df_rates['timestamp'] < current_time + timedelta(minutes=15))]['Cost'].iloc[0]
+
             features = {
                 "minute_of_day": current_time.minute + current_time.hour * 60,
                 "hour_of_day": current_time.hour,
                 "day_of_week": current_time.weekday(),
-                "Cost": row["Cost"],
+                "Cost": current_rate,
                 "grid_data": row["grid_data"],
             }
 
             target_data = pd.DataFrame([features])
             predicted_soc = model.predict(target_data)[0]
             predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
-
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
 
+            # Decision logic for charging, discharging, or holding
+            if predicted_soc < min_soc_threshold or (predicted_soc < 100 and current_rate < charge_cost_threshold):
+                action = 'Charge'
+            elif predicted_soc > min_soc_threshold and current_rate >= charge_cost_threshold:
+                action = 'Discharge'
+            else:
+                action = 'Hold'
+
+            actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
+
         current_time += timedelta(minutes=15)
-
-    actions = {}
-    for timestamp_str, predicted_soc in predictions.items():
-        timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-        cost = df.loc[df['timestamp'] == pd.Timestamp(timestamp), 'Cost'].item()
-
-        if predicted_soc < min_soc_threshold:
-            action = 'Charge'
-        elif cost < night_cost_threshold:
-            action = 'Charge'
-        else:
-            action = 'Hold'
-
-        actions[timestamp_str] = action
-
-
-    print("Predictions:")
-    print(predictions)
 
     return predictions, actions
 
