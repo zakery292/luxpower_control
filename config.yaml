@@ -6,7 +6,8 @@ description: >-
 
   For more details on the LuxPower charge control HACS integration, visit: LuxPower Charge Control HACS Integration. Visit our readme for more information https://github.com/zakery292/charge_controller/blob/main/README.md"
 services: 
-  need: MQTT
+  need: 
+  - MQTT
 backup: cold
 stage: stable
 map: 
