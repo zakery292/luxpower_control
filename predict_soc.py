@@ -92,6 +92,7 @@ def predict_soc_for_day(start_date, end_date, df_rates):
     # Convert start and end dates to datetime objects
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+    print(f"Start timestamp: {start_timestamp}, End timestamp: {end_timestamp}")
 
     predictions = {}
     actions = {}
@@ -100,12 +101,21 @@ def predict_soc_for_day(start_date, end_date, df_rates):
 
     current_time = start_timestamp
     while current_time < end_timestamp:
+        print(f"Processing for timestamp: {current_time}")
         matching_data = df[df["timestamp"] == pd.Timestamp(current_time)]
 
         if not matching_data.empty:
             row = matching_data.iloc[0]
+            print(f"Matching data found for timestamp {current_time}: {row}")
+            
             # Get the cost for the current timestamp from df_rates
-            current_rate = df_rates[(df_rates['timestamp'] >= current_time) & (df_rates['timestamp'] < current_time + timedelta(minutes=15))]['Cost'].iloc[0]
+            rate_matching = df_rates[(df_rates['timestamp'] >= current_time) & (df_rates['timestamp'] < current_time + timedelta(minutes=15))]
+            if rate_matching.empty:
+                print(f"No rate data found for timestamp {current_time}")
+                current_rate = None
+            else:
+                current_rate = rate_matching['Cost'].iloc[0]
+                print(f"Current rate for timestamp {current_time}: {current_rate}")
 
             features = {
                 "minute_of_day": current_time.minute + current_time.hour * 60,
@@ -119,6 +129,7 @@ def predict_soc_for_day(start_date, end_date, df_rates):
             predicted_soc = model.predict(target_data)[0]
             predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
+            print(f"Predicted SOC for {current_time}: {predicted_soc}")
 
             # Decision logic for charging, discharging, or holding
             if predicted_soc < min_soc_threshold or (predicted_soc < 100 and current_rate < charge_cost_threshold):
@@ -127,12 +138,17 @@ def predict_soc_for_day(start_date, end_date, df_rates):
                 action = 'Discharge'
             else:
                 action = 'Hold'
+            print(f"Action for {current_time}: {action}")
 
             actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
+
+        else:
+            print(f"No matching data for timestamp {current_time}")
 
         current_time += timedelta(minutes=15)
 
     return predictions, actions
+
 
 
 

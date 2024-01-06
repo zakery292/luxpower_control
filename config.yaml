@@ -1,5 +1,5 @@
 name: "LuxPower Control & DB"
-version: "1.0.92"
+version: "1.0.93"
 slug: "luxpower-control-db"
 description: >-
  "The "LuxPower Control & DB" addon integrates seamlessly with the LuxPower charge control HACS integration."
