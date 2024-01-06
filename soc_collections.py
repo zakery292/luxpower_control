@@ -12,6 +12,7 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("battery_automation/soc_data")
     client.subscribe("battery_automation/grid_data")
     client.subscribe("battery_automation/rates_data")
+    client.subscribe("battery_automation/solar")
 
 
 def on_message(client, userdata, msg):
@@ -44,6 +45,41 @@ def on_message(client, userdata, msg):
         )
         conn.commit()
         conn.close()
+
+    # Check if the payload contains solar data
+    elif msg.topic == "battery_automation/solar":
+        solar = payload.get("solar", [])  # Get the list of rates
+        timestamp = payload.get(
+            "timestamp", datetime.now().isoformat()
+        )  # Use the provided timestamp
+        print(f"SOC COLLECTIONS  Received Rates data at {timestamp}")
+
+        conn = sqlite3.connect(DATABASE_FILENAME)
+        cursor = conn.cursor()
+        try:
+            for solar in solar:
+                # Extract individual rate data
+                period_start = solar.get("period_start", "")
+                pv_estimate = solar.get("pv_estimate", "")
+                print(f"insterting rate: , {period_start}, {pv_estimate}")
+                # Insert or update the rates data in the database
+                cursor.execute(
+                    """
+                    INSERT INTO solar (datetime, pv_estimate)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (datetime)
+                    DO UPDATE SET pv_estimate = excluded.pv_estimate
+                    WHERE solar.pv_estimate <> excluded.pv_estiamte
+                    """,
+                    (period_start, pv_estimate),
+                )
+                print("SOC COLLECTIONS  Inserted or updated solar data")
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error inserting solar data: {e}")
+
+
 
     elif msg.topic == "battery_automation/rates_data":
         rates = payload.get("rates", [])  # Get the list of rates
@@ -89,6 +125,23 @@ def on_disconnect(client, userdata, rc):
 
 def on_log(client, userdata, level, buf):
     print("SOC COLLECTIONS  Log: ", buf)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
