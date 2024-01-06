@@ -65,7 +65,14 @@ def get_soc_data2():
 
 def train_model(df):
     print("Starting model training...")
-    features = ["minute_of_day", "hour_of_day", "day_of_week", "grid_data"]
+
+    # Include 'Cost' in the features
+    features = ["minute_of_day", "hour_of_day", "day_of_week", "grid_data", "Cost"]
+    
+    # Check if 'Cost' is in the DataFrame and handle if it's not
+    if 'Cost' not in df.columns:
+        df['Cost'] = 0  # You might want to handle this differently based on your data
+    
     X = df[features]
     y = df["soc"]
 
@@ -76,7 +83,6 @@ def train_model(df):
     model = HistGradientBoostingRegressor(random_state=42)
     model.fit(X_train, y_train)
 
-    # Evaluate the model
     y_pred = model.predict(X_test)
     mse = mean_squared_error(y_test, y_pred)
     print("Model evaluation - Mean Squared Error: ", mse)
