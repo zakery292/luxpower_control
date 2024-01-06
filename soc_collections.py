@@ -57,8 +57,8 @@ def on_message(client, userdata, msg):
         try:
             for solar_data in solar_data_list:
                 # Extract individual solar data
-                period_start = solar_data.get("period_start", "")
-                pv_estimate = solar_data.get("pv_estimate", 0)
+                period_start = solar_data["period_start"]
+                pv_estimate = solar_data["pv_estimate"]
 
                 print(f"Inserting solar data: {period_start}, {pv_estimate}")
 
