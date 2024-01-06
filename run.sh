@@ -1,16 +1,7 @@
 #!/bin/bash
 echo "Starting the LuxPowerControl service..."
 
-echo "creating the directory for the database..."
-# Define the directory path within the container
-CONFIG_DIR="/80f651dd_luxpower-control-db"
 
-# Check if the directory exists, and create it if it does not
-if [ ! -d "$CONFIG_DIR" ]; then
-    echo "Directory $CONFIG_DIR does not exist. Creating it..."
-    mkdir -p "$CONFIG_DIR"
-fi
-echo "Directory $CONFIG_DIR exists."
 # Initialize the database
 echo "Initializing the database..."
 python /opt/init_db.py

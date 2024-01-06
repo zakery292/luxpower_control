@@ -12,7 +12,7 @@ from sklearn.pipeline import make_pipeline
 import numpy as np
 import os
 
-DATABASE_FILENAME = "addon_config:/luxpowercontrol_db/"
+DATABASE_FILENAME = "addon_config:/soc_database.db"
 
 
 def get_soc_data2():
