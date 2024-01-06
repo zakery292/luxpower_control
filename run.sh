@@ -6,7 +6,7 @@ echo "Config path: $CONFIG_PATH"
 
 # Function to manually parse simple JSON
 parse_json() {
-    echo $1 | sed -e 's/.*"'$2'": *"\([^"]*\)".*/\1/'
+    echo $1 | sed -e 's/.*"'$2'": *\([^,]*\).*/\1/' | sed -e 's/^"\(.*\)"$/\1/'
 }
 
 echo "Parsing options.json..."
