@@ -124,7 +124,7 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
             print(f"Matching data found for timestamp {current_time}: {row}")
             
             # Get the cost for the current timestamp from df_rates
-            rate_matching = df_rates[(df_rates['timestamp'] >= current_time) & (df_rates['timestamp'] < current_time + timedelta(minutes=15))]
+            rate_matching = df_rates_expanded[(df_rates_expanded['timestamp'] >= current_time) & (df_rates_expanded['timestamp'] < current_time + timedelta(minutes=15))]
             if rate_matching.empty:
                 print(f"No rate data found for timestamp {current_time}")
                 current_rate = None
