@@ -67,7 +67,7 @@ def train_model(df):
     print("Starting model training...")
 
     # Include 'Cost' in the features
-    features = ["minute_of_day", "hour_of_day", "day_of_week", "grid_data", "Cost"]
+    features = ["minute_of_day", "hour_of_day", "day_of_week", "Cost", "grid_data"]
     
     # Check if 'Cost' is in the DataFrame and handle if it's not
     if 'Cost' not in df.columns:
