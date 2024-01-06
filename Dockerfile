@@ -2,7 +2,7 @@ FROM python:3.9
 # Set the working directory
 WORKDIR /opt/
 
-
+ENV PYTHONUNBUFFERED=1
 # Install required Python packages
 RUN pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
 
