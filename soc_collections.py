@@ -108,7 +108,7 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
-print(f'SOC COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user} and password {mqtt_password}')
+print(f'SOC COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
 print('This is from soc_collections.py')
 
 # Connect to MQTT broker
