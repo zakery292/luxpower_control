@@ -1,7 +1,14 @@
 name: "LuxPower Control & DB"
-version: "1.0.165"
+version: "1.0.7"
 slug: "luxpower-control-db"
-description: "This add-on runs data collection and prediction scripts for LuxPower."
+description: >-
+ "The "LuxPower Control & DB" addon integrates seamlessly with the LuxPower charge control HACS integration. It is designed to create a database and host scripts that are crucial for calculating battery entities within the LuxPower charge control system.
+
+  For more details on the LuxPower charge control HACS integration, visit: LuxPower Charge Control HACS Integration. Visit our readme for more information https://github.com/zakery292/charge_controller/blob/main/README.md"
+services: 
+  need: MQTT
+backup: cold
+stage: stable
 map: 
   - addon_config:rw
 arch:
