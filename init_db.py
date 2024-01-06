@@ -2,7 +2,7 @@ import sqlite3
 import os
 
 # Define the full path for the database file inside the Docker container
-DATABASE_FILENAME = "/luxpowercontrol_db/soc_database.db"
+DATABASE_FILENAME = "addon_config:/80f651dd_luxpower-control-db/soc_database.db"
 print("Checking if database exists...")
 
 # Check if the database file exists

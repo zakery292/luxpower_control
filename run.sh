@@ -3,7 +3,7 @@ echo "Starting the LuxPowerControl service..."
 
 echo "creating the directory for the database..."
 # Define the directory path within the container
-CONFIG_DIR="/luxpowercontrol_db"
+CONFIG_DIR="/80f651dd_luxpower-control-db"
 
 # Check if the directory exists, and create it if it does not
 if [ ! -d "$CONFIG_DIR" ]; then

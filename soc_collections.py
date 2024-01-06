@@ -3,7 +3,7 @@ import json
 import paho.mqtt.client as mqtt
 from datetime import datetime
 import os
-DATABASE_FILENAME = "addon_config:/luxpowercontrol_db/"
+DATABASE_FILENAME = "addon_config:/luxpowercontrol_db/soc_database.db"
 
 
 
