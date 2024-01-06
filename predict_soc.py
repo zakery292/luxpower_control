@@ -16,7 +16,7 @@ DATABASE_FILENAME = "soc_database.db"
 
 
 def get_soc_data2():
-    print("Loading data from database...")
+    print("FROM PREDICT Loading data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
 
     # Load SOC data and resample to 30-minute intervals
@@ -31,7 +31,7 @@ def get_soc_data2():
     df_soc_resampled = (
         df_soc.set_index("timestamp").resample("30T").mean().reset_index()
     )
-    print("SOC data loaded and resampled.")
+    print(" FROM PREDICT  SOC data loaded and resampled.")
     print(df_soc_resampled.head())
     # Load Grid data and resample to 30-minute intervals
     df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
@@ -43,7 +43,7 @@ def get_soc_data2():
     df_grid_resampled = (
         df_grid.set_index("timestamp").resample("30T").mean().reset_index()
     )
-    print("Grid data loaded and resampled.")
+    print(" FROM PREDICT  Grid data loaded and resampled.")
     print(df_grid_resampled.head())
     # Load Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
@@ -53,13 +53,13 @@ def get_soc_data2():
     ).dt.time
     df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S").dt.time
     df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
-    print("Rates data loaded.")
+    print(" FROM PREDICT Rates data loaded.")
     print(df_rates.head())
     # Merge SOC and Grid data
     df_merged = pd.merge(
         df_soc_resampled, df_grid_resampled, on="timestamp", how="outer"
     )
-    print("SOC and Grid data merged.")
+    print("FROM PREDICT SOC and Grid data merged.")
     print(df_merged.head())
 
     # Function to find the matching rate for each timestamp
@@ -72,7 +72,7 @@ def get_soc_data2():
 
     # Apply the function to get rates
     df_merged["Cost"] = df_merged.apply(get_rate_for_timestamp, axis=1)
-    print("Merged SOC, Grid, and Rates data.")
+    print("FROM PREDICT Merged SOC, Grid, and Rates data.")
     print(df_merged.head())
 
     # Add minute_of_day, hour_of_day, and day_of_week columns
@@ -82,13 +82,13 @@ def get_soc_data2():
 
     # Handle missing values using forward fill
     df_merged.ffill(inplace=True)
-    print("NaN values handled.")
+    print("FROM PREDICT  NaN values handled.")
 
     return df_merged
 
 
 def train_model(df):
-    print("Starting model training...")
+    print(" FROM PREDICT Starting model training...")
     features = ["minute_of_day", "hour_of_day", "day_of_week", "Cost", "grid_data"]
     X = df[features]
     y = df["soc"]
@@ -109,11 +109,11 @@ def train_model(df):
 
 
 def predict_soc_for_day(target_date):
-    print("predict_soc_for_day called with target_date:", target_date)
+    print("FROM PREDICT predict_soc_for_day called with target_date:", target_date)
     df = get_soc_data2()
-    print("Data fetched from get_soc_data2")
+    print("FROM PREDICT Data fetched from get_soc_data2")
     model = train_model(df)
-    print("Model trained")
+    print("FROM PREDICT Model trained")
 
     # Get rates data for the target date
     conn = sqlite3.connect(DATABASE_FILENAME)
@@ -163,9 +163,9 @@ def predict_soc_for_day(target_date):
                 "grid_data": [grid_data],
             }
         )
-        print("Predicting for timestamp:", current_time)
+        print("FROM PREDICT Predicting for timestamp:", current_time)
         predicted_soc = model.predict(target_data)[0]
-        print("Prediction:", predicted_soc)
+        print("FROM PREDICT Prediction:", predicted_soc)
         # Ensure SOC stays within 10-100% range
         predicted_soc = max(10, min(predicted_soc, 100))
         timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -177,7 +177,7 @@ def predict_soc_for_day(target_date):
 
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
+    print("FROM PREDICT Connected with result code " + str(rc))
     client.subscribe("battery_soc/request")
 
 
@@ -188,11 +188,11 @@ def on_message(client, userdata, msg):
         predictions = predict_soc_for_day(target_date)
         client.publish("battery_soc/response", json.dumps(predictions))
 def on_disconnect(client, userdata, rc):
-    print("Disconnected with result code " + str(rc))
+    print("FROM PREDICT Disconnected with result code " + str(rc))
 
 
 def on_log(client, userdata, level, buf):
-    print("Log: ", buf)
+    print("FROM PREDICT Log: ", buf)
 
 # Set MQTT username and password from environment variables
 mqtt_username = os.getenv('MQTT_USER', 'default_user')
@@ -207,13 +207,13 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
-print(f'Conneting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_username} and password {mqtt_password}')
+print(f'FROM PREDICT Conneting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_username} and password {mqtt_password}')
 print('This is from precition_soc.py')
 # Connect to MQTT broker
 try:
     client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
-    print(f"Failed to connect to MQTT broker: {e}")
+    print(f"FROM PREDICT Failed to connect to MQTT broker: {e}")
     exit(1)
 
 # Start the loop

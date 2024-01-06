@@ -6,16 +6,23 @@ echo "Config path: $CONFIG_PATH"
 
 # Function to manually parse simple JSON
 parse_json() {
-    echo $1 | sed -e 's/.*"'$2'": *\([^,]*\).*/\1/' | sed -e 's/^"\(.*\)"$/\1/'
+    key=$1
+    config=$2
+    pattern="\"$key\": \"([^\"]*)\""
+    if [[ $config =~ $pattern ]]; then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo "Error: Key $key not found in JSON config."
+    fi
 }
 
 echo "Parsing options.json..."
 # Read the MQTT configuration
 CONFIG_CONTENT=$(cat $CONFIG_PATH)
-MQTT_HOST=$(parse_json "$CONFIG_CONTENT" mqtt_host)
-MQTT_PORT=$(parse_json "$CONFIG_CONTENT" mqtt_port)
-MQTT_USER=$(parse_json "$CONFIG_CONTENT" mqtt_user)
-MQTT_PASSWORD=$(parse_json "$CONFIG_CONTENT" mqtt_password)
+MQTT_HOST=$(parse_json "mqtt_host" "$CONFIG_CONTENT")
+MQTT_PORT=$(parse_json "mqtt_port" "$CONFIG_CONTENT")
+MQTT_USER=$(parse_json "mqtt_user" "$CONFIG_CONTENT")
+MQTT_PASSWORD=$(parse_json "mqtt_password" "$CONFIG_CONTENT")
 
 echo "MQTT Configuration:"
 echo "Host: $MQTT_HOST"

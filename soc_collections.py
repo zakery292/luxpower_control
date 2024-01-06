@@ -4,18 +4,18 @@ import paho.mqtt.client as mqtt
 from datetime import datetime
 import os
 DATABASE_FILENAME = "soc_database.db"
-print("hellow World")
+
 
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
+    print("SOC COLLECTIONS Connected with result code " + str(rc))
     client.subscribe("battery_automation/soc_data")
     client.subscribe("battery_automation/grid_data")
     client.subscribe("battery_automation/rates_data")
 
 
 def on_message(client, userdata, msg):
-    print("Message received on topic: " + msg.topic)
+    print("SOC COLLECTIONS Message received on topic: " + msg.topic)
 
     payload = json.loads(msg.payload)
     timestamp = payload.get("timestamp")
@@ -23,7 +23,7 @@ def on_message(client, userdata, msg):
     # Check if the payload contains SoC data
     if "soc" in payload:
         soc = payload["soc"]
-        print(f"Received SoC data: {soc} at {timestamp}")
+        print(f"SOC COLLECTIONS  Received SoC data: {soc} at {timestamp}")
         conn = sqlite3.connect(DATABASE_FILENAME)
         cursor = conn.cursor()
         cursor.execute(
@@ -35,7 +35,7 @@ def on_message(client, userdata, msg):
     # Check if the payload contains grid data
     elif "grid" in payload:
         grid = payload["grid"]
-        print(f"Received Grid data: {grid} at {timestamp}")
+        print(f"SOC COLLECTIONS  Received Grid data: {grid} at {timestamp}")
         conn = sqlite3.connect(DATABASE_FILENAME)
         cursor = conn.cursor()
         cursor.execute(
@@ -50,7 +50,7 @@ def on_message(client, userdata, msg):
         timestamp = payload.get(
             "timestamp", datetime.now().isoformat()
         )  # Use the provided timestamp
-        print(f"Received Rates data at {timestamp}")
+        print(f"SOC COLLECTIONS  Received Rates data at {timestamp}")
 
         conn = sqlite3.connect(DATABASE_FILENAME)
         cursor = conn.cursor()
@@ -74,15 +74,15 @@ def on_message(client, userdata, msg):
         conn.commit()
         conn.close()
     else:
-        print("Other message received")
+        print("SOC COLLECTIONS  Other message received")
 
 
 def on_disconnect(client, userdata, rc):
-    print("Disconnected with result code " + str(rc))
+    print("SOC COLLECTIONS  Disconnected with result code " + str(rc))
 
 
 def on_log(client, userdata, level, buf):
-    print("Log: ", buf)
+    print("SOC COLLECTIONS  Log: ", buf)
 
 
 # Set MQTT username and password from environment variables
@@ -98,13 +98,13 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
-print(f'Conneting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_username} and password {mqtt_password}')
+print(f'SOC COLLECTIONS  Conneting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_username} and password {mqtt_password}')
 print('This is from soc_collections.py')
 # Connect to MQTT broker
 try:
     client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
-    print(f"Failed to connect to MQTT broker: {e}")
+    print(f"SOC COLLECTIONS  Failed to connect to MQTT broker: {e}")
     exit(1)
 
 # Start the loop
