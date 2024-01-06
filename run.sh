@@ -20,6 +20,7 @@ echo "Starting Python scripts..."
 run_with_restart "/opt/soc_collections.py" > >(tee -a /proc/1/fd/1) 2> >(tee -a /proc/1/fd/2) &
 run_with_restart "/opt/predict_soc.py" > >(tee -a /proc/1/fd/1) 2> >(tee -a /proc/1/fd/2) &
 run_with_restart "/opt/db_cleanup.py" > >(tee -a /proc/1/fd/1) 2> >(tee -a /proc/1/fd/2) &
+run_with_restart "/opt/solar_collections.py" > >(tee -a /proc/1/fd/1) 2> >(tee -a /proc/1/fd/2) &
 
 echo "LuxPower Control & DB Add-on started successfully."
 # Wait for the processes to complete
