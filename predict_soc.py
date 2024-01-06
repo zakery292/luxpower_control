@@ -45,8 +45,8 @@ def get_soc_data2():
     # Expanding rates to 15-minute intervals
     expanded_rates = []
     for _, row in df_rates.iterrows():
-        current_time = datetime.combine(row["Date"].date(), datetime.strptime(row["StartTime"], '%H:%M:%S').time())
-        end_time = datetime.combine(row["Date"].date(), datetime.strptime(row["EndTime"], '%H:%M:%S').time())
+        current_time = datetime.combine(row["Date"], row["StartTime"])
+        end_time = datetime.combine(row["Date"], row["EndTime"])
         while current_time < end_time:
             expanded_rates.append({"timestamp": current_time, "Cost": row["Cost"]})
             current_time += timedelta(minutes=15)
