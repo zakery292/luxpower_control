@@ -8,6 +8,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 import numpy as np
+from dateutil import parser
+
 
 DATABASE_FILENAME = "/config/soc_database.db"
 
@@ -18,9 +20,7 @@ def get_soc_data2():
 
     # Load and process SOC data
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
-    df_soc["timestamp"] = pd.to_datetime(
-        df_soc["timestamp"], format="%Y-%m-%d %H:%M:%S"
-    )
+    df_soc["timestamp"] = df_soc["timestamp"].apply(parser.parse)
     df_soc["day_of_week"] = df_soc["timestamp"].dt.dayofweek
     df_soc.set_index("timestamp", inplace=True)
     df_soc = df_soc.resample("15T").mean().reset_index()
@@ -28,12 +28,17 @@ def get_soc_data2():
 
     # Load and process Grid data
     df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
-    df_grid["timestamp"] = pd.to_datetime(
-        df_grid["timestamp"], format="%Y-%m-%d %H:%M:%S"
-    )
+    df_grid["timestamp"] = df_grid["timestamp"].apply(parser.parse)
     df_grid.set_index("timestamp", inplace=True)
     df_grid = df_grid.resample("15T").mean().reset_index()
     print("Grid data headers:", df_grid.columns.tolist())
+
+    # Load and process Rates data
+    df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
+    df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
+    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"], format="%H:%M:%S")
+    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S")
+    df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
 
     # Load and process Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
