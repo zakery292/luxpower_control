@@ -124,9 +124,10 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     request_data = json.loads(msg.payload)
-    target_date = request_data.get("target_date")
-    if target_date:
-        predictions = predict_soc_for_day(target_date)
+    start_date = request_data.get("start_date")
+    end_date = request_data.get("end_date")
+    if start_date and end_date:
+        predictions = predict_soc_for_day(start_date, end_date)
         client.publish("battery_soc/response", json.dumps(predictions))
 def on_disconnect(client, userdata, rc):
     print("FROM PREDICT Disconnected with result code " + str(rc))
@@ -156,14 +157,14 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
-print(f'SOC COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
-print('This is from soc_collections.py')
+print(f'SOC PREDICT  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
+print('This is from predict_soc.py')
 
 # Connect to MQTT broker
 try:
     client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
-    print(f"SOC COLLECTIONS  Failed to connect to MQTT broker: {e}")
+    print(f"SOC PREDICT Failed to connect to MQTT broker: {e}")
     exit(1)
 
 # Start the loop
