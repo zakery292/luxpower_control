@@ -1,5 +1,5 @@
 import sqlite3
-import datetime
+from datetime import datetime, time
 from apscheduler.schedulers.background import BackgroundScheduler
 
 def delete_old_data():
