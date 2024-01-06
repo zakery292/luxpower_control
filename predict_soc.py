@@ -4,11 +4,11 @@ from datetime import datetime, timedelta
 import pandas as pd
 import sqlite3
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import make_pipeline
+from sklearn.experimental import enable_hist_gradient_boosting  # noqa
+from sklearn.ensemble import HistGradientBoostingRegressor
 import numpy as np
 from dateutil import parser
+from sklearn.metrics import mean_squared_error
 
 
 DATABASE_FILENAME = "/config/soc_database.db"
@@ -68,15 +68,18 @@ def train_model(df):
     X = df[features]
     y = df["soc"]
 
-    imputer = SimpleImputer(strategy="mean")
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
 
-    model = make_pipeline(
-        imputer, RandomForestRegressor(n_estimators=200, random_state=42)
-    )
+    model = HistGradientBoostingRegressor(random_state=42)
     model.fit(X_train, y_train)
+
+    # Evaluate the model
+    y_pred = model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    print("Model evaluation - Mean Squared Error: ", mse)
+
     return model
 
 
