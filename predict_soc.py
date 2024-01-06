@@ -9,7 +9,8 @@ import numpy as np
 from dateutil import parser
 from sklearn.metrics import mean_squared_error
 
-
+BATTERY_CAPACITY_KWH = 19.2  # Battery capacity in kWh
+CHARGE_DISCHARGE_RATE_W = 3800  
 DATABASE_FILENAME = "/config/soc_database.db"
 
 
@@ -77,7 +78,7 @@ def train_model(df):
     y = df["soc"]
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=0.2, random_state=60
     )
 
     model = HistGradientBoostingRegressor(random_state=42)
@@ -147,13 +148,12 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
             print(f"Predicted SOC for {current_time}: {predicted_soc}")
 
             # Decision logic for charging, discharging, or holding
-            if predicted_soc < min_soc_threshold or (predicted_soc < 100 and current_rate < charge_cost_threshold):
+            if predicted_soc < min_soc_threshold:
                 action = 'Charge'
-            elif predicted_soc > min_soc_threshold and current_rate >= charge_cost_threshold:
+            elif predicted_soc > (BATTERY_CAPACITY_KWH * 1000 - CHARGE_DISCHARGE_RATE_W / 4 / 1000):  # Adjusted for 15 minutes interval
                 action = 'Discharge'
             else:
                 action = 'Hold'
-            print(f"Action for {current_time}: {action}")
 
             actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
 
