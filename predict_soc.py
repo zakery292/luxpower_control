@@ -15,50 +15,44 @@ DATABASE_FILENAME = "/config/soc_database.db"
 
 
 def get_soc_data2():
-    print("Loading data from database...")
+    print("FROM PREDICT Loading data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
 
-    # Load and process SOC data
+    # Load and resample SOC data to 15-minute intervals
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
-    df_soc["timestamp"] = df_soc["timestamp"].apply(parser.parse)
-    df_soc["day_of_week"] = df_soc["timestamp"].dt.dayofweek
-    df_soc.set_index("timestamp", inplace=True)
-    df_soc = df_soc.resample("15T").mean().reset_index()
+    df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
     df_soc["minute_of_day"] = df_soc["timestamp"].dt.minute
     df_soc["hour_of_day"] = df_soc["timestamp"].dt.hour
-    print("SOC data headers:", df_soc.columns.tolist())
+    df_soc["day_of_week"] = df_soc["timestamp"].dt.dayofweek
+    df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
 
-    # Load and process Grid data
+    # Load and resample Grid data to 15-minute intervals
     df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
-    df_grid["timestamp"] = df_grid["timestamp"].apply(parser.parse)
-    df_grid.set_index("timestamp", inplace=True)
-    df_grid = df_grid.resample("15T").mean().reset_index()
-    print("Grid data headers:", df_grid.columns.tolist())
+    df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
+    df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
 
     # Load and process Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
-    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"], format="%H:%M:%S").dt.time
-    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S").dt.time
-    df_rates["Cost"] = df_rates["Cost"].astype(str).str.rstrip("p").astype(float)
+    df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
 
-    # Expanding rates to 15-minute intervals
+    # Expand Rates data to 15-minute intervals
     expanded_rates = []
     for _, row in df_rates.iterrows():
-        current_time = datetime.combine(row["Date"], row["StartTime"])
+        start_time = datetime.combine(row["Date"], row["StartTime"])
         end_time = datetime.combine(row["Date"], row["EndTime"])
-        while current_time < end_time:
-            expanded_rates.append({"timestamp": current_time, "Cost": row["Cost"]})
-            current_time += timedelta(minutes=15)
-
+        while start_time < end_time:
+            expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
+            start_time += timedelta(minutes=15)
     df_rates_expanded = pd.DataFrame(expanded_rates)
 
     # Merge SOC, Grid, and Expanded Rates data
-    df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
+    df_merged = pd.merge(df_soc_resampled, df_grid_resampled, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
-    df_merged.ffill(inplace=True)  # Forward fill to handle any NaNs from resampling
 
-    print("Merged data headers:", df_merged.columns.tolist())
+    # Forward fill NaN values for continuity
+    df_merged.ffill(inplace=True)
+
     return df_merged
 
 
