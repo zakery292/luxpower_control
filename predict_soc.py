@@ -52,15 +52,17 @@ def get_soc_data2():
     df_rates_expanded = pd.DataFrame(expanded_rates)
     print("Expanded Rates data headers:", df_rates_expanded.columns.tolist())
     print(df_rates_expanded.head())
-    # Merge SOC and Grid data first
-    df_merged = pd.merge_asof(df_soc_resampled.sort_values('timestamp'), df_grid_resampled.sort_values('timestamp'), on="timestamp", tolerance=pd.Timedelta('7.5T'), direction='nearest')
+    # Ensure that the timestamps are rounded to the nearest 15 minutes for all dataframes
+    df_soc_resampled['timestamp'] = df_soc_resampled['timestamp'].dt.round('15T')
+    df_grid_resampled['timestamp'] = df_grid_resampled['timestamp'].dt.round('15T')
+    df_rates_expanded['timestamp'] = df_rates_expanded['timestamp'].dt.round('15T')
 
-    # Then merge with Rates data
-    df_merged = pd.merge_asof(df_merged.sort_values('timestamp'), df_rates_expanded.sort_values('timestamp'), on="timestamp", tolerance=pd.Timedelta('7.5T'), direction='nearest')
+    # Merge SOC, Grid, and Expanded Rates data
+    df_merged = pd.merge(df_soc_resampled, df_grid_resampled, on="timestamp", how="outer")
+    df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
+
+    # Forward fill to handle NaNs
     df_merged.ffill(inplace=True)
-    df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
-    df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
-    df_merged['day_of_week'] = df_merged['timestamp'].dt.dayofweek
     
     
     print("Merged data headers:", df_merged.columns.tolist())
@@ -92,19 +94,22 @@ def train_model(df):
 
 
 def predict_soc_for_day(start_date, end_date):
-    print(
-        "predict_soc_for_day called with start_date:", start_date, "end_date:", end_date
-    )
+    print("predict_soc_for_day called with start_date:", start_date, "end_date:", end_date)
     df = get_soc_data2()
     model = train_model(df)
-    night_cost_threshold: 20.00
+
+    # Define the night cost threshold
+    night_cost_threshold = 20.00  # Example value, adjust as needed
+    min_soc_threshold = 10  # Minimum SOC to prevent full discharge
+
+    # Convert start and end dates to datetime objects
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
     predictions = {}
     current_time = start_timestamp
     while current_time < end_timestamp:
-        matching_data = df[df["timestamp"] == current_time]
+        matching_data = df[df["timestamp"] == pd.Timestamp(current_time)]
 
         if not matching_data.empty:
             row = matching_data.iloc[0]
@@ -118,28 +123,25 @@ def predict_soc_for_day(start_date, end_date):
 
             target_data = pd.DataFrame([features])
             predicted_soc = model.predict(target_data)[0]
-            predicted_soc = max(
-                10, min(predicted_soc, 100)
-            )  # Ensuring SOC is within bounds
+            predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
 
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
 
         current_time += timedelta(minutes=15)
 
-        actions = {}
-        min_soc_threshold = 10  # Minimum SOC to prevent full discharge
+    actions = {}
+    for timestamp_str, predicted_soc in predictions.items():
+        timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+        cost = df.loc[df['timestamp'] == pd.Timestamp(timestamp), 'Cost'].item()
 
-        for timestamp, predicted_soc in predictions.items():
-            cost = df.loc[df['timestamp'] == timestamp, 'Cost'].item()
+        if predicted_soc < min_soc_threshold:
+            action = 'Charge'
+        elif cost < night_cost_threshold:
+            action = 'Charge'
+        else:
+            action = 'Hold'
 
-            if predicted_soc < min_soc_threshold:
-                action = 'Charge'  # Charge if SOC is below minimum threshold
-            elif cost < night_cost_threshold:  # Define your night_cost_threshold
-                action = 'Charge'  # Prefer to charge when cost is low
-            else:
-                action = 'Hold'  # Hold otherwise
-
-            actions[timestamp] = action
+        actions[timestamp_str] = action
 
     return predictions, actions
 
