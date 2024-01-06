@@ -5,9 +5,11 @@ FROM $BUILD_FROM
 # Set the working directory
 WORKDIR /opt/
 
-# Install Python and required packages
-RUN apk add --no-cache python3 py3-pip \
-    && pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
+# Install Python and pip
+RUN apk add --no-cache python3 py3-pip
+
+# Install Python packages
+RUN pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
 
 # Copy your scripts to the container
 COPY soc_collections.py predict_soc.py init_db.py run.sh ./
