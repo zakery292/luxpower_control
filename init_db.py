@@ -1,7 +1,9 @@
 import sqlite3
 
-DATABASE_FILENAME = "soc_database.db"
+# Define the full path for the database file
+DATABASE_FILENAME = "/opt/soc_database.db"
 print("Creating database with file name " + DATABASE_FILENAME)
+
 conn = sqlite3.connect(DATABASE_FILENAME)
 cursor = conn.cursor()
 
