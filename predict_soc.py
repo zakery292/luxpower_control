@@ -38,9 +38,9 @@ def get_soc_data2():
     # Load and process Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
-    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"].apply(str), format="%H:%M:%S").dt.time
-    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"].apply(str), format="%H:%M:%S").dt.time
-    df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
+    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"], format="%H:%M:%S").dt.time
+    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S").dt.time
+    df_rates["Cost"] = df_rates["Cost"].astype(str).str.rstrip("p").astype(float)
 
     # Expanding rates to 15-minute intervals
     expanded_rates = []
