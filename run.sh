@@ -4,17 +4,16 @@ echo "Starting LuxPower Control & DB Add-on..."
 
 CONFIG_PATH="/data/options.json"
 
-# Check if the options.json file exists
-if [ ! -f "$CONFIG_PATH" ]; then
-    echo "Configuration file not found: $CONFIG_PATH"
-    exit 1
-fi
-echo "Reading MQTT configuration..."
-# Use jq to parse the MQTT configuration options
-MQTT_HOST=$(jq --raw-output '.mqtt_host' "$CONFIG_PATH")
-MQTT_PORT=$(jq --raw-output '.mqtt_port' "$CONFIG_PATH")
-MQTT_USER=$(jq --raw-output '.mqtt_user' "$CONFIG_PATH")
-MQTT_PASSWORD=$(jq --raw-output '.mqtt_password' "$CONFIG_PATH")
+# Function to manually parse simple JSON
+parse_json() {
+    echo $1 | sed -e 's/.*"'$2'":\([^,}]*\).*/\1/'
+}
+
+# Read the MQTT configuration
+MQTT_HOST=$(parse_json "$(cat $CONFIG_PATH)" mqtt_host)
+MQTT_PORT=$(parse_json "$(cat $CONFIG_PATH)" mqtt_port)
+MQTT_USER=$(parse_json "$(cat $CONFIG_PATH)" mqtt_user)
+MQTT_PASSWORD=$(parse_json "$(cat $CONFIG_PATH)" mqtt_password)
 
 # Export these settings as environment variables
 export MQTT_HOST MQTT_PORT MQTT_USER MQTT_PASSWORD
