@@ -54,25 +54,31 @@ def on_message(client, userdata, msg):
 
         conn = sqlite3.connect(DATABASE_FILENAME)
         cursor = conn.cursor()
-        for rate in rates:
-            # Extract individual rate data
-            cost = rate.get("Cost", "")
-            date = rate.get("Date", "")
-            start_time = rate.get("Start Time", "")
-            end_time = rate.get("End Time", "")
-
-            # Insert or update the rates data in the database
-            cursor.execute(
-                """
-                INSERT INTO rates_data (Date, StartTime, EndTime, Cost)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (Date, StartTime, EndTime)
-                DO UPDATE SET Cost = excluded.cost
-                """,
-                (date, start_time, end_time, cost),
-            )
-        conn.commit()
-        conn.close()
+        try:
+            for rate in rates:
+                # Extract individual rate data
+                cost = rate.get("Cost", "")
+                date = rate.get("Date", "")
+                start_time = rate.get("Start Time", "")
+                end_time = rate.get("End Time", "")
+                print(f"insterting rate: , {date}, {start_time}, {end_time}, {cost}")
+                # Insert or update the rates data in the database
+                cursor.execute(
+                    """
+                    INSERT INTO rates_data (Date, StartTime, EndTime, Cost)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (Date, StartTime, EndTime)
+                    DO UPDATE SET Cost = excluded.cost
+                    WHERE rates_data.Cost <> excluded.cost
+                    """,
+                    (date, start_time, end_time, cost),
+                )
+                print("SOC COLLECTIONS  Inserted or updated rates data")
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error inserting rates data: {e}")
+         
     else:
         print("SOC COLLECTIONS  Other message received")
 
