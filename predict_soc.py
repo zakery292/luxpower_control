@@ -194,26 +194,35 @@ def on_disconnect(client, userdata, rc):
 def on_log(client, userdata, level, buf):
     print("FROM PREDICT Log: ", buf)
 
-# Set MQTT username and password from environment variables
-mqtt_username = os.getenv('MQTT_USER', 'default_user')
-mqtt_password = os.getenv('MQTT_PASSWORD', 'default_password')
-mqtt_host = os.getenv('MQTT_HOST', '192.168.1.135')
-mqtt_port = int(os.getenv('MQTT_PORT', 1883))
+def get_mqtt_config():
+    config_path = '/data/options.json'
+    try:
+        with open(config_path, 'r') as file:
+            config = json.load(file)
+        return config['mqtt_host'], int(config['mqtt_port']), config['mqtt_user'], config['mqtt_password']
+    except Exception as e:
+        print(f"Error reading MQTT configuration: {e}")
+        # Default values if the configuration file is not found or there's an error
+        return '192.168.1.135', 1883, 'default_user', 'default_password'
+
+# Get MQTT configuration
+mqtt_host, mqtt_port, mqtt_user, mqtt_password = get_mqtt_config()
 
 # Set up MQTT client
 client = mqtt.Client()
-client.username_pw_set(mqtt_username, password=mqtt_password)  # Set username and password
+client.username_pw_set(mqtt_user, password=mqtt_password)  # Set username and password
 client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
-print(f'FROM PREDICT Conneting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_username} and password {mqtt_password}')
-print('This is from precition_soc.py')
+print(f'SOC COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user} and password {mqtt_password}')
+print('This is from soc_collections.py')
+
 # Connect to MQTT broker
 try:
     client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
-    print(f"FROM PREDICT Failed to connect to MQTT broker: {e}")
+    print(f"SOC COLLECTIONS  Failed to connect to MQTT broker: {e}")
     exit(1)
 
 # Start the loop
