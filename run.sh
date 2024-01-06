@@ -26,13 +26,13 @@ echo "User: $MQTT_USER"
 
 echo "Initializing the database..."
 
-python ./init_db.py
+python /opt/init_db.py
 
 echo "Starting Python scripts..."
 
 # Run your Python scripts here, e.g.,
-python /path/to/your/soc_collections.py &
-python /path/to/your/predict_soc.py &
+python /opt/soc_collections.py &
+python /opt/predict_soc.py &
 
 
 # Log script startup completion
