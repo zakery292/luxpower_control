@@ -108,6 +108,7 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     # Convert start and end dates to datetime objects
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+    total_charge_cost_pence = 0.0
     print(f"Start timestamp: {start_timestamp}, End timestamp: {end_timestamp}")
 
     predictions = {}
@@ -148,12 +149,14 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
             print(f"Predicted SOC for {current_time}: {predicted_soc}")
 
             # Decision logic for charging, discharging, or holding
-            if predicted_soc < min_soc_threshold:
+            if current_time.hour < 7 and predicted_soc < 80:  # Prefer charging during off-peak hours
                 action = 'Charge'
-            elif predicted_soc > (BATTERY_CAPACITY_KWH * 1000 - CHARGE_DISCHARGE_RATE_W / 4 / 1000):  # Adjusted for 15 minutes interval
+                total_charge_cost_pence += (CHARGE_DISCHARGE_RATE_W / 1000) * 0.25 * current_rate  # Assuming 15 minutes intervals 
+            elif current_time.hour >= 18 and predicted_soc > 20:  # Prefer discharging during peak hours
                 action = 'Discharge'
             else:
                 action = 'Hold'
+
 
             actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
 
@@ -161,6 +164,8 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
             print(f"No matching data for timestamp {current_time}")
 
         current_time += timedelta(minutes=15)
+    total_charge_cost_pounds = total_charge_cost_pence / 100
+    print(f"Total estimated charge cost for the period: £{total_charge_cost_pounds:.2f}")
 
     return predictions, actions
 
