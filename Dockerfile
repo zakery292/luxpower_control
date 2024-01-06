@@ -1,14 +1,12 @@
-# Use Home Assistant base image for ARMv7
-ARG BUILD_FROM=homeassistant/armv7-base:latest
-FROM $BUILD_FROM
+FROM python:3.9-alpine
 
 # Set the working directory
 WORKDIR /opt/
 
-# Install Python and pip
-RUN apk add --no-cache python3 py3-pip
+# Install jq and other required packages
+RUN apk add --no-cache jq
 
-# Install Python packages
+# Install required Python packages
 RUN pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
 
 # Copy your scripts to the container

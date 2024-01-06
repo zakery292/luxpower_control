@@ -1,35 +1,42 @@
-#!/usr/bin/env bashio
-
-# Logging configuration and script start
+#!/bin/bash
 echo "Starting LuxPower Control & DB Add-on..."
+# Define the path to the options.json file
 
-# Read the configuration options from Home Assistant
+CONFIG_PATH="/data/options.json"
+
+# Check if the options.json file exists
+if [ ! -f "$CONFIG_PATH" ]; then
+    echo "Configuration file not found: $CONFIG_PATH"
+    exit 1
+fi
 echo "Reading MQTT configuration..."
-MQTT_HOST=$(bashio::config 'mqtt_host')
-MQTT_PORT=$(bashio::config 'mqtt_port')
-MQTT_USER=$(bashio::config 'mqtt_user')
-MQTT_PASSWORD=$(bashio::config 'mqtt_password')
+# Use jq to parse the MQTT configuration options
+MQTT_HOST=$(jq --raw-output '.mqtt_host' "$CONFIG_PATH")
+MQTT_PORT=$(jq --raw-output '.mqtt_port' "$CONFIG_PATH")
+MQTT_USER=$(jq --raw-output '.mqtt_user' "$CONFIG_PATH")
+MQTT_PASSWORD=$(jq --raw-output '.mqtt_password' "$CONFIG_PATH")
 
-# Log the MQTT configuration (excluding password for security)
+# Export these settings as environment variables
+export MQTT_HOST MQTT_PORT MQTT_USER MQTT_PASSWORD
+
+# Debug: Print the MQTT configuration
 echo "MQTT Configuration:"
 echo "Host: $MQTT_HOST"
 echo "Port: $MQTT_PORT"
 echo "User: $MQTT_USER"
 
-# Export these settings as environment variables
-export MQTT_HOST MQTT_PORT MQTT_USER MQTT_PASSWORD
-
-# Initialize the database
 echo "Initializing the database..."
+
 python ./init_db.py
 
-# Start your Python scripts
 echo "Starting Python scripts..."
-python ./soc_collections.py &
-python ./predict_soc.py &
+
+# Run your Python scripts here, e.g.,
+python /path/to/your/soc_collections.py &
+python /path/to/your/predict_soc.py &
+
 
 # Log script startup completion
 echo "LuxPower Control & DB Add-on started successfully."
-
-# Wait indefinitely to keep the container running
+# Wait for the processes to complete
 wait
