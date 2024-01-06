@@ -24,6 +24,8 @@ def get_soc_data2():
     df_soc["day_of_week"] = df_soc["timestamp"].dt.dayofweek
     df_soc.set_index("timestamp", inplace=True)
     df_soc = df_soc.resample("15T").mean().reset_index()
+    df_soc["minute_of_day"] = df_soc["timestamp"].dt.minute
+    df_soc["hour_of_day"] = df_soc["timestamp"].dt.hour
     print("SOC data headers:", df_soc.columns.tolist())
 
     # Load and process Grid data
@@ -36,22 +38,15 @@ def get_soc_data2():
     # Load and process Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
-    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"], format="%H:%M:%S")
-    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S")
-    df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
-
-    # Load and process Rates data
-    df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
-    df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
-    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"], format="%H:%M:%S")
-    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S")
+    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"].apply(str), format="%H:%M:%S").dt.time
+    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"].apply(str), format="%H:%M:%S").dt.time
     df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
 
     # Expanding rates to 15-minute intervals
     expanded_rates = []
     for _, row in df_rates.iterrows():
-        current_time = datetime.combine(row["Date"].date(), row["StartTime"].time())
-        end_time = datetime.combine(row["Date"].date(), row["EndTime"].time())
+        current_time = datetime.combine(row["Date"].date(), datetime.strptime(row["StartTime"], '%H:%M:%S').time())
+        end_time = datetime.combine(row["Date"].date(), datetime.strptime(row["EndTime"], '%H:%M:%S').time())
         while current_time < end_time:
             expanded_rates.append({"timestamp": current_time, "Cost": row["Cost"]})
             current_time += timedelta(minutes=15)
@@ -61,6 +56,7 @@ def get_soc_data2():
     # Merge SOC, Grid, and Expanded Rates data
     df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
+    df_merged.ffill(inplace=True)  # Forward fill to handle any NaNs from resampling
 
     print("Merged data headers:", df_merged.columns.tolist())
     return df_merged
