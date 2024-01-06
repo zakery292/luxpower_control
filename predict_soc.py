@@ -52,11 +52,17 @@ def get_soc_data2():
     df_rates_expanded = pd.DataFrame(expanded_rates)
     print("Expanded Rates data headers:", df_rates_expanded.columns.tolist())
     print(df_rates_expanded.head())
+    # Merge SOC and Grid data first
+    df_merged = pd.merge_asof(df_soc_resampled.sort_values('timestamp'), df_grid_resampled.sort_values('timestamp'), on="timestamp", tolerance=pd.Timedelta('7.5T'), direction='nearest')
 
-    # Merge SOC, Grid, and Expanded Rates data
-    df_merged = pd.merge(df_soc_resampled, df_grid_resampled, on="timestamp", how="outer")
-    df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
+    # Then merge with Rates data
+    df_merged = pd.merge_asof(df_merged.sort_values('timestamp'), df_rates_expanded.sort_values('timestamp'), on="timestamp", tolerance=pd.Timedelta('7.5T'), direction='nearest')
     df_merged.ffill(inplace=True)
+    df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
+    df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
+    df_merged['day_of_week'] = df_merged['timestamp'].dt.dayofweek
+    
+    
     print("Merged data headers:", df_merged.columns.tolist())
     print(df_merged.head())
 
@@ -91,7 +97,7 @@ def predict_soc_for_day(start_date, end_date):
     )
     df = get_soc_data2()
     model = train_model(df)
-
+    night_cost_threshold: 20.00
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
@@ -120,7 +126,23 @@ def predict_soc_for_day(start_date, end_date):
 
         current_time += timedelta(minutes=15)
 
-    return predictions
+        actions = {}
+        min_soc_threshold = 10  # Minimum SOC to prevent full discharge
+
+        for timestamp, predicted_soc in predictions.items():
+            cost = df.loc[df['timestamp'] == timestamp, 'Cost'].item()
+
+            if predicted_soc < min_soc_threshold:
+                action = 'Charge'  # Charge if SOC is below minimum threshold
+            elif cost < night_cost_threshold:  # Define your night_cost_threshold
+                action = 'Charge'  # Prefer to charge when cost is low
+            else:
+                action = 'Hold'  # Hold otherwise
+
+            actions[timestamp] = action
+
+    return predictions, actions
+
 
 
 def on_connect(client, userdata, flags, rc):
