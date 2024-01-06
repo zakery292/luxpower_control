@@ -9,7 +9,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 import numpy as np
 
-DATABASE_FILENAME = "soc_database.db"
+DATABASE_FILENAME = "/config/soc_database.db"
 
 
 def get_soc_data2():
