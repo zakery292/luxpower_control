@@ -21,20 +21,25 @@ def get_soc_data2():
     # Load and resample SOC data to 15-minute intervals
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
     df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
-    df_soc["minute_of_day"] = df_soc["timestamp"].dt.minute
-    df_soc["hour_of_day"] = df_soc["timestamp"].dt.hour
-    df_soc["day_of_week"] = df_soc["timestamp"].dt.dayofweek
     df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
+    print("SOC data headers:", df_soc_resampled.columns.tolist())
+    print(df_soc_resampled.head())
 
     # Load and resample Grid data to 15-minute intervals
     df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
     df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
     df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
+    print("Grid data headers:", df_grid_resampled.columns.tolist())
+    print(df_grid_resampled.head())
 
     # Load and process Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
+    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
+    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
     df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
+    print("Rates data headers:", df_rates.columns.tolist())
+    print(df_rates.head())
 
     # Expand Rates data to 15-minute intervals
     expanded_rates = []
@@ -45,15 +50,18 @@ def get_soc_data2():
             expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
             start_time += timedelta(minutes=15)
     df_rates_expanded = pd.DataFrame(expanded_rates)
+    print("Expanded Rates data headers:", df_rates_expanded.columns.tolist())
+    print(df_rates_expanded.head())
 
     # Merge SOC, Grid, and Expanded Rates data
     df_merged = pd.merge(df_soc_resampled, df_grid_resampled, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
-
-    # Forward fill NaN values for continuity
     df_merged.ffill(inplace=True)
+    print("Merged data headers:", df_merged.columns.tolist())
+    print(df_merged.head())
 
     return df_merged
+
 
 
 def train_model(df):
