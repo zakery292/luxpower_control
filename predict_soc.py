@@ -113,6 +113,8 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
 
     predictions = {}
     actions = {}
+    prev_soc = None  # Variable to store the previous SOC value
+    
     min_soc_threshold = 10  # Minimum SOC to prevent full discharge
     charge_cost_threshold = 20.00  # Cost threshold for charging
 
@@ -148,15 +150,20 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
             print(f"Predicted SOC for {current_time}: {predicted_soc}")
 
-            # Decision logic for charging, discharging, or holding
-            if current_time.hour < 7 and predicted_soc < 80:  # Prefer charging during off-peak hours
-                action = 'Charge'
-                total_charge_cost_pence += (CHARGE_DISCHARGE_RATE_W / 1000) * 0.25 * current_rate  # Assuming 15 minutes intervals 
-            elif current_time.hour >= 18 and predicted_soc > 20:  # Prefer discharging during peak hours
-                action = 'Discharge'
+            if prev_soc is not None:
+                if predicted_soc > prev_soc:  # SOC is increasing
+                    action = 'Charge'
+                elif predicted_soc < prev_soc:  # SOC is decreasing
+                    action = 'Discharge'
+                else:  # SOC is stable
+                    action = 'Hold'
             else:
-                action = 'Hold'
-
+                action = 'Hold'  # Default action for the first timestamp
+            
+            print(f"Action for {current_time}: {action}")
+            actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
+            prev_soc = predicted_soc  # Update previous SOC for the next iteration
+    
 
             actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
 
