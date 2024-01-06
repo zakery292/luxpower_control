@@ -24,6 +24,7 @@ def get_soc_data2():
     df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
     print("SOC data headers:", df_soc_resampled.columns.tolist())
     print(df_soc_resampled.head())
+    print("Unique timestamps in SOC data:", df_soc_resampled['timestamp'].unique())
 
     # Load and resample Grid data to 15-minute intervals
     df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
@@ -31,7 +32,7 @@ def get_soc_data2():
     df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
     print("Grid data headers:", df_grid_resampled.columns.tolist())
     print(df_grid_resampled.head())
-
+    print("Unique timestamps in Grid data:", df_grid_resampled['timestamp'].unique())
     # Load and process Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
@@ -53,6 +54,8 @@ def get_soc_data2():
     print("Expanded Rates data headers:", df_rates_expanded.columns.tolist())
     print(df_rates_expanded.head())
     # Ensure that the timestamps are rounded to the nearest 15 minutes for all dataframes
+    print("Unique timestamps in Rates data:", df_rates_expanded['timestamp'].unique())
+    
     # Round the timestamps to the nearest 15 minutes in all DataFrames
     df_soc_resampled['timestamp'] = df_soc_resampled['timestamp'].dt.round('15T')
     print("SOC data after rounding timestamps:")
@@ -157,6 +160,10 @@ def predict_soc_for_day(start_date, end_date):
             action = 'Hold'
 
         actions[timestamp_str] = action
+
+
+    print("Predictions:")
+    print(predictions)
 
     return predictions, actions
 
