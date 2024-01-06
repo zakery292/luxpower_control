@@ -4,16 +4,11 @@ echo "Starting the LuxPowerControl service..."
 CONFIG_PATH="/data/options.json"
 echo "Config path: $CONFIG_PATH"
 
-# Function to manually parse simple JSON
+# Function to manually parse simple JSON using grep and awk
 parse_json() {
     key=$1
     config=$2
-    pattern="\"$key\": \"([^\"]*)\""
-    if [[ $config =~ $pattern ]]; then
-        echo "${BASH_REMATCH[1]}"
-    else
-        echo "Error: Key $key not found in JSON config."
-    fi
+    echo $(grep -o "\"$key\": \"[^\"]*" "$CONFIG_PATH" | awk -F\" '{ print $4 }')
 }
 
 echo "Parsing options.json..."

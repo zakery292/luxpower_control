@@ -1,5 +1,5 @@
 name: "LuxPower Control & DB"
-version: "1.0.157"
+version: "1.0.158"
 slug: "luxpower-control-db"
 description: "This add-on runs data collection and prediction scripts for LuxPower."
 arch:
