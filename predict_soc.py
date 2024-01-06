@@ -32,7 +32,7 @@ def get_soc_data2():
     print("Grid data headers:", df_grid_resampled.columns.tolist())
     print(df_grid_resampled.head())
     print("Unique timestamps in Grid data:", df_grid_resampled['timestamp'].unique())
-   
+
     # Round the timestamps to the nearest 15 minutes in all DataFrames
     df_soc_resampled['timestamp'] = df_soc_resampled['timestamp'].dt.round('15T')
     print("SOC data after rounding timestamps:")
@@ -42,13 +42,9 @@ def get_soc_data2():
     print("Grid data after rounding timestamps:")
     print(df_grid_resampled.head())
 
-    df_rates_expanded['timestamp'] = df_rates_expanded['timestamp'].dt.round('15T')
-    print("Rates data after rounding timestamps:")
-    print(df_rates_expanded.head())
 
     # Merge the DataFrames
     df_merged = pd.merge(df_soc_resampled, df_grid_resampled, on="timestamp", how="outer")
-    df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
     df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
 
     print("Merged DataFrame with SOC, Grid, and Cost data:")
@@ -168,6 +164,9 @@ def on_message(client, userdata, msg):
 
         predictions, actions = predict_soc_for_day(start_date, end_date, df_rates_expanded)
         client.publish("battery_soc/response", json.dumps({"predictions": predictions, "actions": actions}))
+
+def on_disconnect(client, userdata, rc):
+    print("FROM PREDICT Disconnected with result code " + str(rc))
 
 
 def on_log(client, userdata, level, buf):
