@@ -2,7 +2,7 @@ name: "LuxPower Control & DB"
 version: "1.0.162"
 slug: "luxpower-control-db"
 description: "This add-on runs data collection and prediction scripts for LuxPower."
-
+map: "/addon_config/luxpowercontrol_db/"
 arch:
   - aarch64
   - amd64
