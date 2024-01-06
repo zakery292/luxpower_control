@@ -2,8 +2,6 @@ FROM python:3.9
 # Set the working directory
 WORKDIR /opt/
 
-# Install jq and other required packages
-RUN apk add --no-cache jq
 
 # Install required Python packages
 RUN pip install --no-cache-dir numpy pandas scikit-learn paho-mqtt
