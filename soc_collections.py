@@ -48,34 +48,33 @@ def on_message(client, userdata, msg):
 
     # Check if the payload contains solar data
     elif msg.topic == "battery_automation/solar":
-        solar = payload.get("solar", [])  # Get the list of rates
-        timestamp = payload.get(
-            "timestamp", datetime.now().isoformat()
-        )  # Use the provided timestamp
-        print(f"SOC COLLECTIONS  Received Rates data at {timestamp}")
+        solar_data_list = json.loads(msg.payload)
+        print(f"SOC COLLECTIONS  Received solar data")
 
         conn = sqlite3.connect(DATABASE_FILENAME)
         cursor = conn.cursor()
         try:
-            for solar in solar:
-                # Extract individual rate data
-                period_start = solar.get("period_start", "")
-                pv_estimate = solar.get("pv_estimate", "")
-                print(f"insterting rate: , {period_start}, {pv_estimate}")
-                # Insert or update the rates data in the database
+            for solar_data in solar_data_list:
+                # Extract individual solar data
+                period_start = solar_data.get("period_start", "")
+                pv_estimate = solar_data.get("pv_estimate", 0)
+
+                print(f"Inserting solar data: {period_start}, {pv_estimate}")
+
+                # Insert or update the solar data in the database
                 cursor.execute(
                     """
                     INSERT INTO solar (datetime, pv_estimate)
-                    VALUES (?, ?, ?, ?)
+                    VALUES (?, ?)
                     ON CONFLICT (datetime)
                     DO UPDATE SET pv_estimate = excluded.pv_estimate
-                    WHERE solar.pv_estimate <> excluded.pv_estiamte
+                    WHERE solar.pv_estimate <> excluded.pv_estimate
                     """,
                     (period_start, pv_estimate),
                 )
-                print("SOC COLLECTIONS  Inserted or updated solar data")
-            conn.commit()
-            conn.close()
+                print("Inserted or updated solar data")
+                conn.commit()
+                conn.close()
         except Exception as e:
             print(f"Error inserting solar data: {e}")
 
