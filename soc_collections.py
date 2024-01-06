@@ -12,7 +12,6 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("battery_automation/soc_data")
     client.subscribe("battery_automation/grid_data")
     client.subscribe("battery_automation/rates_data")
-    client.subscribe("battery_automation/solar")
 
 
 def on_message(client, userdata, msg):
@@ -45,46 +44,6 @@ def on_message(client, userdata, msg):
         )
         conn.commit()
         conn.close()
-
-    # Check if the payload contains solar data
-    elif msg.topic == "battery_automation/solar":
-        solar_data_list = json.loads(msg.payload.decode('utf-8'))
-        print(f"SOC COLLECTIONS  Received solar data")
-
-        conn = sqlite3.connect(DATABASE_FILENAME)
-        cursor = conn.cursor()
-
-        try:
-            for solar_data in solar_data_list:
-                # Extract individual solar data
-                period_start = solar_data["period_start"]
-                pv_estimate = solar_data["pv_estimate"]
-
-                print(f"Inserting solar data: {period_start}, {pv_estimate}")
-
-                # Convert period_start to a datetime object and format it as needed
-                period_start_dt = datetime.fromisoformat(period_start)
-                formatted_period_start = period_start_dt.strftime('%Y-%m-%d %H:%M:%S')
-
-                # Insert or update the solar data in the database
-                cursor.execute(
-                    """
-                    INSERT INTO solar (datetime, pv_estimate)
-                    VALUES (?, ?)
-                    ON CONFLICT (datetime)
-                    DO UPDATE SET pv_estimate = excluded.pv_estimate
-                    WHERE solar.pv_estimate <> excluded.pv_estimate
-                    """,
-                    (formatted_period_start, pv_estimate),
-                )
-                print("Inserted or updated solar data")
-
-            conn.commit()
-        except Exception as e:
-            print(f"Error inserting solar data: {e}")
-        finally:
-            conn.close()
-
 
     elif msg.topic == "battery_automation/rates_data":
         rates = payload.get("rates", [])  # Get the list of rates
@@ -130,25 +89,6 @@ def on_disconnect(client, userdata, rc):
 
 def on_log(client, userdata, level, buf):
     print("SOC COLLECTIONS  Log: ", buf)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Function to read MQTT configuration from the options.json file
 def get_mqtt_config():
