@@ -53,20 +53,35 @@ def get_soc_data2():
     print("Expanded Rates data headers:", df_rates_expanded.columns.tolist())
     print(df_rates_expanded.head())
     # Ensure that the timestamps are rounded to the nearest 15 minutes for all dataframes
+    # Round the timestamps to the nearest 15 minutes in all DataFrames
     df_soc_resampled['timestamp'] = df_soc_resampled['timestamp'].dt.round('15T')
-    df_grid_resampled['timestamp'] = df_grid_resampled['timestamp'].dt.round('15T')
-    df_rates_expanded['timestamp'] = df_rates_expanded['timestamp'].dt.round('15T')
+    print("SOC data after rounding timestamps:")
+    print(df_soc_resampled.head())
 
-    # Merge SOC, Grid, and Expanded Rates data
+    df_grid_resampled['timestamp'] = df_grid_resampled['timestamp'].dt.round('15T')
+    print("Grid data after rounding timestamps:")
+    print(df_grid_resampled.head())
+
+    df_rates_expanded['timestamp'] = df_rates_expanded['timestamp'].dt.round('15T')
+    print("Rates data after rounding timestamps:")
+    print(df_rates_expanded.head())
+
+    # Merge the DataFrames
     df_merged = pd.merge(df_soc_resampled, df_grid_resampled, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
+    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
 
-    # Forward fill to handle NaNs
-    df_merged.ffill(inplace=True)
-    
-    
-    print("Merged data headers:", df_merged.columns.tolist())
+    print("Merged DataFrame with SOC, Grid, and Cost data:")
     print(df_merged.head())
+        # Add these columns to the merged DataFrame
+    df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
+    df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
+    df_merged['day_of_week'] = df_merged['timestamp'].dt.dayofweek
+
+    print("Merged DataFrame with added columns for model training:")
+    print(df_merged.head())
+        
+
 
     return df_merged
 
