@@ -48,11 +48,12 @@ def on_message(client, userdata, msg):
 
     # Check if the payload contains solar data
     elif msg.topic == "battery_automation/solar":
-        solar_data_list = json.loads(msg.payload)
+        solar_data_list = json.loads(msg.payload.decode('utf-8'))
         print(f"SOC COLLECTIONS  Received solar data")
 
         conn = sqlite3.connect(DATABASE_FILENAME)
         cursor = conn.cursor()
+
         try:
             for solar_data in solar_data_list:
                 # Extract individual solar data
@@ -60,6 +61,10 @@ def on_message(client, userdata, msg):
                 pv_estimate = solar_data.get("pv_estimate", 0)
 
                 print(f"Inserting solar data: {period_start}, {pv_estimate}")
+
+                # Convert period_start to a datetime object and format it as needed
+                period_start_dt = datetime.fromisoformat(period_start)
+                formatted_period_start = period_start_dt.strftime('%Y-%m-%d %H:%M:%S')
 
                 # Insert or update the solar data in the database
                 cursor.execute(
@@ -70,14 +75,15 @@ def on_message(client, userdata, msg):
                     DO UPDATE SET pv_estimate = excluded.pv_estimate
                     WHERE solar.pv_estimate <> excluded.pv_estimate
                     """,
-                    (period_start, pv_estimate),
+                    (formatted_period_start, pv_estimate),
                 )
                 print("Inserted or updated solar data")
-                conn.commit()
-                conn.close()
+
+            conn.commit()
         except Exception as e:
             print(f"Error inserting solar data: {e}")
-
+        finally:
+            conn.close()
 
 
     elif msg.topic == "battery_automation/rates_data":
