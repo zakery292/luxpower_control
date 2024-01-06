@@ -3,7 +3,7 @@ import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta
 import pandas as pd
 import sqlite3
-from sklearn.model_selection import train_test_splita
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import HistGradientBoostingRegressor
 import numpy as np
 from dateutil import parser
