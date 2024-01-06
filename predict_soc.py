@@ -90,9 +90,18 @@ def train_model(df):
     return model
 
 
-def predict_soc_for_day(start_date, end_date, df_rates):
+def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     print("predict_soc_for_day called with start_date:", start_date, "end_date:", end_date)
     df = get_soc_data2()
+
+    # Merge the rates data
+    df = pd.merge(df, df_rates_expanded, on="timestamp", how="outer")
+    df.ffill(inplace=True)  # Forward fill to handle NaNs
+
+    # Add the 'Cost' feature only if it's missing
+    if 'Cost' not in df.columns:
+        df['Cost'] = 0
+
     model = train_model(df)
 
     # Convert start and end dates to datetime objects
