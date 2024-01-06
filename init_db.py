@@ -1,8 +1,15 @@
 import sqlite3
+import os
 
-# Define the full path for the database file
-DATABASE_FILENAME = "/opt/soc_database.db"
-print("Creating database with file name " + DATABASE_FILENAME)
+# Define the full path for the database file inside the Docker container
+DATABASE_FILENAME = "/luxpowercontrol_db/soc_database.db"
+print("Checking if database exists...")
+
+# Check if the database file exists
+if not os.path.exists(DATABASE_FILENAME):
+    print("No database found. Creating a new one...")
+else:
+    print("Existing database found. Continuing...")
 
 conn = sqlite3.connect(DATABASE_FILENAME)
 cursor = conn.cursor()
@@ -25,4 +32,4 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS grid_data (
 
 conn.commit()
 conn.close()
-print(f"Database created with the file name {DATABASE_FILENAME}")
+print(f"Database operation completed. File: {DATABASE_FILENAME}")
