@@ -65,7 +65,7 @@ def get_soc_data2():
 
 def train_model(df):
     print("Starting model training...")
-    features = ["minute_of_day", "hour_of_day", "day_of_week", "Cost", "grid_data"]
+    features = ["minute_of_day", "hour_of_day", "day_of_week", "grid_data"]
     X = df[features]
     y = df["soc"]
 
