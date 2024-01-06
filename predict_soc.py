@@ -3,8 +3,7 @@ import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta
 import pandas as pd
 import sqlite3
-from sklearn.model_selection import train_test_split
-from sklearn.experimental import enable_hist_gradient_boosting  # noqa
+from sklearn.model_selection import train_test_splita
 from sklearn.ensemble import HistGradientBoostingRegressor
 import numpy as np
 from dateutil import parser
@@ -33,29 +32,7 @@ def get_soc_data2():
     print("Grid data headers:", df_grid_resampled.columns.tolist())
     print(df_grid_resampled.head())
     print("Unique timestamps in Grid data:", df_grid_resampled['timestamp'].unique())
-    # Load and process Rates data
-    df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
-    df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
-    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
-    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
-    df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
-    print("Rates data headers:", df_rates.columns.tolist())
-    print(df_rates.head())
-
-    # Expand Rates data to 15-minute intervals
-    expanded_rates = []
-    for _, row in df_rates.iterrows():
-        start_time = datetime.combine(row["Date"], row["StartTime"])
-        end_time = datetime.combine(row["Date"], row["EndTime"])
-        while start_time < end_time:
-            expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
-            start_time += timedelta(minutes=15)
-    df_rates_expanded = pd.DataFrame(expanded_rates)
-    print("Expanded Rates data headers:", df_rates_expanded.columns.tolist())
-    print(df_rates_expanded.head())
-    # Ensure that the timestamps are rounded to the nearest 15 minutes for all dataframes
-    print("Unique timestamps in Rates data:", df_rates_expanded['timestamp'].unique())
-    
+   
     # Round the timestamps to the nearest 15 minutes in all DataFrames
     df_soc_resampled['timestamp'] = df_soc_resampled['timestamp'].dt.round('15T')
     print("SOC data after rounding timestamps:")
@@ -173,10 +150,24 @@ def on_message(client, userdata, msg):
     start_date = request_data.get("start_date")
     end_date = request_data.get("end_date")
     if start_date and end_date:
-        predictions = predict_soc_for_day(start_date, end_date)
-        client.publish("battery_soc/response", json.dumps(predictions))
-def on_disconnect(client, userdata, rc):
-    print("FROM PREDICT Disconnected with result code " + str(rc))
+        conn = sqlite3.connect(DATABASE_FILENAME)
+        df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
+        df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
+        df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
+        df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
+        df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
+
+        expanded_rates = []
+        for _, row in df_rates.iterrows():
+            start_time = datetime.combine(row["Date"], row["StartTime"])
+            end_time = datetime.combine(row["Date"], row["EndTime"])
+            while start_time < end_time:
+                expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
+                start_time += timedelta(minutes=15)
+        df_rates_expanded = pd.DataFrame(expanded_rates)
+
+        predictions, actions = predict_soc_for_day(start_date, end_date, df_rates_expanded)
+        client.publish("battery_soc/response", json.dumps({"predictions": predictions, "actions": actions}))
 
 
 def on_log(client, userdata, level, buf):
