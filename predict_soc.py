@@ -152,7 +152,6 @@ def on_message(client, userdata, msg):
         # Merge the dataframes
         df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
         df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
-        df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
         df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
 
         # Add necessary time columns
