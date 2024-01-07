@@ -159,7 +159,7 @@ def on_message(client, userdata, msg):
         # Add necessary time columns
         df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
         df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
-        df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday()
+        df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday
 
         # Train the model
         model = train_model(df_merged)
