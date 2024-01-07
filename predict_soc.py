@@ -52,15 +52,17 @@ def prepare_data():
     df_grid = get_grid_data()
     df_solar = get_solar_data()
     
+    # Change 'datetime' to 'timestamp' in df_solar for consistent merging
+    df_solar = df_solar.rename(columns={"datetime": "timestamp"})
+
     # Merge and preprocess data
     df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
-    df_merged.ffill(inplace=True)
+    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
     df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
     df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
     df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday()
     return df_merged
-
 def predict_soc_for_day(start_date, end_date, model, df):
     print("Predicting SOC for the day...")
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
