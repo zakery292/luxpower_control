@@ -16,21 +16,31 @@ def get_soc_data():
     conn = sqlite3.connect(DATABASE_FILENAME)
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
     df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
-    return df_soc.set_index("timestamp").resample("15T").mean().reset_index()
+    df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
+    print("SOC data headers:", df_soc_resampled.columns.tolist())
+    print(df_soc_resampled.head(4))  # Print first 4 rows
+    return df_soc_resampled
 
 def get_grid_data():
     print("Loading Grid data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
     df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
     df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
-    return df_grid.set_index("timestamp").resample("15T").mean().reset_index()
+    df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
+    print("Grid data headers:", df_grid_resampled.columns.tolist())
+    print(df_grid_resampled.head(4))  # Print first 4 rows
+    return df_grid_resampled
 
 def get_solar_data():
     print("Loading Solar data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
     df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
     df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
-    return df_solar.set_index("datetime").resample("15T").mean().reset_index()
+    df_solar_resampled = df_solar.set_index("datetime").resample("15T").mean().reset_index()
+    print("Solar data headers:", df_solar_resampled.columns.tolist())
+    df_solar_resampled = df_solar_resampled.rename(columns={"datetime": "timestamp"})
+    print(df_solar_resampled.head(4))  # Print first 4 rows
+    return df_solar_resampled
 
 
 def get_rates_data():
@@ -56,6 +66,7 @@ def get_rates_data():
             start_time += timedelta(minutes=15)
     
     df_rates_expanded = pd.DataFrame(expanded_rates)
+    print(df_rates_expanded.head(4))  #
     return df_rates_expanded
 
 def train_model(df):
@@ -97,7 +108,7 @@ def prepare_data():
 
     df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
     df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
-    print("Headers after final merge with Rates data:", df_merged.columns.tolist())
+    print("Headers after final merge with Rates data:", df_merged.head(4))
 
     # Corrected attribute access
     df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
@@ -115,17 +126,22 @@ def predict_soc_for_day(start_date, end_date, model, df):
     predictions = {}
     current_time = start_timestamp
     while current_time < end_timestamp:
-        row = df[df["timestamp"] == current_time].iloc[0]
-        features = {
-            "minute_of_day": current_time.minute + current_time.hour * 60,
-            "hour_of_day": current_time.hour,
-            "day_of_week": current_time.weekday(),
-            "Cost": row["Cost"],
-            "grid_data": row["grid_data"],
-            "pv_estimate": row["pv_estimate"]
-        }
-        predicted_soc = model.predict(pd.DataFrame([features]))[0]
-        predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = max(0, min(predicted_soc, 100))
+        matching_rows = df[df["timestamp"] == current_time]
+        if not matching_rows.empty:
+            row = matching_rows.iloc[0]
+            features = {
+                "minute_of_day": current_time.minute + current_time.hour * 60,
+                "hour_of_day": current_time.hour,
+                "day_of_week": current_time.weekday(),
+                "Cost": row.get("Cost", 0),
+                "grid_data": row.get("grid_data", 0),
+                "pv_estimate": row.get("pv_estimate", 0)
+            }
+            predicted_soc = model.predict(pd.DataFrame([features]))[0]
+            predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = max(0, min(predicted_soc, 100))
+        else:
+            print(f"No data for timestamp: {current_time}")
+            predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = None
         current_time += timedelta(minutes=15)
 
     return predictions
