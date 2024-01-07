@@ -94,9 +94,18 @@ def train_model(df):
 def get_solar_data():
     print("Loading solar data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
-    df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
+    df_solar = pd.read_sql_query("SELECT datetime, pv_estimate FROM solar", conn)
     df_solar["timestamp"] = pd.to_datetime(df_solar["datetime"])
-    df_solar_resampled = df_solar.set_index("timestamp").resample("15T").mean().reset_index()
+    df_solar = df_solar.drop(columns=['datetime'])  # Drop the original datetime column
+    df_solar.set_index("timestamp", inplace=True)
+
+    # Ensure pv_estimate is numeric
+    df_solar['pv_estimate'] = pd.to_numeric(df_solar['pv_estimate'], errors='coerce')
+    
+    # Resample and compute mean only for numeric columns
+    df_solar_resampled = df_solar.resample("15T").mean().reset_index()
+
+    # Round the timestamps to the nearest 15 minutes
     df_solar_resampled['timestamp'] = df_solar_resampled['timestamp'].dt.round('15T')
     return df_solar_resampled
 
