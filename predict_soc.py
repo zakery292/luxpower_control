@@ -32,6 +32,32 @@ def get_solar_data():
     df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
     return df_solar.set_index("datetime").resample("15T").mean().reset_index()
 
+
+def get_rates_data():
+    print("Loading rates data from database...")
+    conn = sqlite3.connect(DATABASE_FILENAME)
+
+    # Query to select data from rates table
+    df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
+
+    # Ensure that 'Date' is a datetime object and 'Cost' is numeric
+    df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
+    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
+    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
+    df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
+
+    # Expand rates data to 15-minute intervals
+    expanded_rates = []
+    for _, row in df_rates.iterrows():
+        start_time = datetime.combine(row["Date"], row["StartTime"])
+        end_time = datetime.combine(row["Date"], row["EndTime"])
+        while start_time < end_time:
+            expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
+            start_time += timedelta(minutes=15)
+    
+    df_rates_expanded = pd.DataFrame(expanded_rates)
+    return df_rates_expanded
+
 def train_model(df):
     print("Starting model training...")
     features = ["minute_of_day", "hour_of_day", "day_of_week", "Cost", "grid_data", "pv_estimate"]
@@ -51,21 +77,25 @@ def prepare_data():
     df_soc = get_soc_data()
     df_grid = get_grid_data()
     df_solar = get_solar_data()
-    
+    df_rates = get_rates_data()  # Function to fetch rates data
+
     # Change 'datetime' to 'timestamp' in df_solar for consistent merging
     df_solar = df_solar.rename(columns={"datetime": "timestamp"})
 
     # Merge and preprocess data
     df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
+    df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
     df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
 
     # Corrected attribute access
     df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
     df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
-    df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday  # Corrected this line
+    df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday
 
     return df_merged
+
+
 def predict_soc_for_day(start_date, end_date, model, df):
     print("Predicting SOC for the day...")
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
