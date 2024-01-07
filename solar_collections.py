@@ -6,57 +6,91 @@ import os
 DATABASE_FILENAME = "/config/soc_database.db"
 
 
+
 def on_connect(client, userdata, flags, rc):
-    print("SOLAR COLLECTIONS Connected with result code " + str(rc))
-    client.subscribe("battery_automation/solar")
+    print("SOC COLLECTIONS Connected with result code " + str(rc))
+    client.subscribe("battery_automation/soc_data")
+    client.subscribe("battery_automation/grid_data")
+    client.subscribe("battery_automation/rates_data")
+
 
 def on_message(client, userdata, msg):
-    print("SOLAR COLLECTIONS Message received on topic: " + msg.topic)
-    # Check if the payload contains solar data
-    msg.topic == "battery_automation/solar"
-    solar_data_list = json.loads(msg.payload.decode('utf-8'))
-    print(f"SOLAR COLLECTIONS  Received solar data")
+    print("SOC COLLECTIONS Message received on topic: " + msg.topic)
 
-    conn = sqlite3.connect(DATABASE_FILENAME)
-    cursor = conn.cursor()
+    payload = json.loads(msg.payload)
+    timestamp = payload.get("timestamp")
 
-    try:
-        for solar_data in solar_data_list:
-            # Extract individual solar data
-            period_start = solar_data["period_start"]
-            pv_estimate = solar_data["pv_estimate"]
-
-            print(f"Inserting solar data: {period_start}, {pv_estimate}")
-
-            # Convert period_start to a datetime object and format it as needed
-            period_start_dt = datetime.fromisoformat(period_start)
-            formatted_period_start = period_start_dt.strftime('%Y-%m-%d %H:%M:%S')
-
-            # Insert or update the solar data in the database
-            cursor.execute(
-                """
-                INSERT INTO solar (datetime, pv_estimate)
-                VALUES (?, ?)
-                ON CONFLICT (datetime)
-                DO UPDATE SET pv_estimate = excluded.pv_estimate
-                WHERE solar.pv_estimate <> excluded.pv_estimate
-                """,
-                (formatted_period_start, pv_estimate),
-            )
-            print("Inserted or updated solar data")
-
+    # Check if the payload contains SoC data
+    if "soc" in payload:
+        soc = payload["soc"]
+        print(f"SOC COLLECTIONS  Received SoC data: {soc} at {timestamp}")
+        conn = sqlite3.connect(DATABASE_FILENAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO soc_data (timestamp, soc) VALUES (?, ?)", (timestamp, soc)
+        )
         conn.commit()
-    except Exception as e:
-        print(f"Error inserting solar data: {e}")
-    finally:
         conn.close()
 
+    # Check if the payload contains grid data
+    elif "grid" in payload:
+        grid = payload["grid"]
+        print(f"SOC COLLECTIONS  Received Grid data: {grid} at {timestamp}")
+        conn = sqlite3.connect(DATABASE_FILENAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO grid_data (timestamp, grid_data) VALUES (?, ?)",
+            (timestamp, grid),
+        )
+        conn.commit()
+        conn.close()
+
+    elif msg.topic == "battery_automation/rates_data":
+        rates = payload.get("rates", [])  # Get the list of rates
+        timestamp = payload.get(
+            "timestamp", datetime.now().isoformat()
+        )  # Use the provided timestamp
+        print(f"SOC COLLECTIONS  Received Rates data at {timestamp}")
+
+        conn = sqlite3.connect(DATABASE_FILENAME)
+        cursor = conn.cursor()
+        try:
+            for rate in rates:
+                # Extract individual rate data
+                cost = rate.get("Cost", "")
+                date = rate.get("Date", "")
+                start_time = rate.get("Start Time", "")
+                end_time = rate.get("End Time", "")
+                print(f"insterting rate: , {date}, {start_time}, {end_time}, {cost}")
+                # Insert or update the rates data in the database
+                cursor.execute(
+                    """
+                    INSERT INTO rates_data (Date, StartTime, EndTime, Cost)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (Date, StartTime, EndTime)
+                    DO UPDATE SET Cost = excluded.cost
+                    WHERE rates_data.Cost <> excluded.cost
+                    """,
+                    (date, start_time, end_time, cost),
+                )
+                print("SOC COLLECTIONS  Inserted or updated rates data")
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error inserting rates data: {e}")
+         
+    else:
+        print("SOC COLLECTIONS  Other message received")
+
+
 def on_disconnect(client, userdata, rc):
-    print("SOLAR COLLECTIONS  Disconnected with result code " + str(rc))
+    print("SOC COLLECTIONS  Disconnected with result code " + str(rc))
 
 
 def on_log(client, userdata, level, buf):
-    print("SOLAR COLLECTIONS  Log: ", buf)
+    print("SOC COLLECTIONS  Log: ", buf)
+
+
 
 # Function to read MQTT configuration from the options.json file
 def get_mqtt_config():
@@ -80,14 +114,14 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
-print(f'SOLAR COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
-print('This is from SOLAR COLLECTIONS.py')
+print(f'SOC COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
+print('This is from soc_collections.py')
 
 # Connect to MQTT broker
 try:
     client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
-    print(f"SOLAR COLLECTIONS  Failed to connect to MQTT broker: {e}")
+    print(f"SOC COLLECTIONS  Failed to connect to MQTT broker: {e}")
     exit(1)
 
 # Start the loop

@@ -91,6 +91,16 @@ def train_model(df):
     return model
 
 
+def get_solar_data():
+    print("Loading solar data from database...")
+    conn = sqlite3.connect(DATABASE_FILENAME)
+    df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
+    df_solar["timestamp"] = pd.to_datetime(df_solar["datetime"])
+    df_solar_resampled = df_solar.set_index("timestamp").resample("15T").mean().reset_index()
+    df_solar_resampled['timestamp'] = df_solar_resampled['timestamp'].dt.round('15T')
+    return df_solar_resampled
+
+
 def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     print("predict_soc_for_day called with start_date:", start_date, "end_date:", end_date)
     df = get_soc_data2()
@@ -102,6 +112,11 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     # Add the 'Cost' feature only if it's missing
     if 'Cost' not in df.columns:
         df['Cost'] = 0
+
+    df_solar_resampled = get_solar_data()
+    df_merged = pd.merge(df_merged, df_solar_resampled, on="timestamp", how="outer")
+    df_merged.ffill(inplace=True)  # Forward fill to handle NaN
+
 
     model = train_model(df)
 
@@ -117,7 +132,6 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     
     min_charge_soc = 20  # Minimum SOC to start charging
     max_discharge_soc = 80  # Maximum SOC to start discharging
-
     current_time = start_timestamp
     while current_time < end_timestamp:
         print(f"Processing for timestamp: {current_time}")
@@ -144,19 +158,16 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
                 "grid_data": row["grid_data"],
             }
 
-            target_data = pd.DataFrame([features])
-            predicted_soc = model.predict(target_data)[0]
-            predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
-            predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
+            solar_generation = row["pv_estimate"] / 2  # Halve the 30 min kWh value for 15 min
+            net_grid_usage = row["grid_data"] - solar_generation * 1000  # Convert kWh to W
 
-            # Adjusted decision logic
-            if prev_soc is not None:
-                if predicted_soc > prev_soc and predicted_soc < max_discharge_soc:
-                    action = 'Charge'
-                elif predicted_soc < prev_soc and predicted_soc > min_charge_soc:
-                    action = 'Discharge'
-                else:
-                    action = 'Hold'
+            # Adjusted decision logic with solar and charging considerations
+            if net_grid_usage < 0 and predicted_soc < max_discharge_soc:  # Excess solar
+                action = 'Charge with Solar'
+            elif predicted_soc < min_charge_soc or (predicted_soc < 100 and current_rate < charge_cost_threshold):
+                action = 'Charge'
+            elif predicted_soc > min_charge_soc and current_rate >= charge_cost_threshold:
+                action = 'Discharge'
             else:
                 action = 'Hold'
 

@@ -90,6 +90,8 @@ def on_disconnect(client, userdata, rc):
 def on_log(client, userdata, level, buf):
     print("SOC COLLECTIONS  Log: ", buf)
 
+
+
 # Function to read MQTT configuration from the options.json file
 def get_mqtt_config():
     config_path = '/data/options.json'
