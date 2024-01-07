@@ -9,9 +9,15 @@ import numpy as np
 from dateutil import parser
 from sklearn.metrics import mean_squared_error
 
+# Constants
 BATTERY_CAPACITY_KWH = 19.2  # Battery capacity in kWh
 CHARGE_DISCHARGE_RATE_W = 3800  
+MAX_CHARGE_RATE = CHARGE_DISCHARGE_RATE_W / 1000  # Charge rate in kW
+MAX_DISCHARGE_RATE = CHARGE_DISCHARGE_RATE_W / 1000  # Discharge rate in kW
 DATABASE_FILENAME = "/config/soc_database.db"
+MIN_CHARGE_SOC = 20  # Minimum SOC to start charging
+MAX_DISCHARGE_SOC = 80  # Maximum SOC to start discharging
+CHARGE_COST_THRESHOLD = 20
 
 
 def get_soc_data2():
@@ -115,80 +121,74 @@ def get_solar_data():
 
 def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     print("predict_soc_for_day called with start_date:", start_date, "end_date:", end_date)
+    
+    # Fetch data from database and prepare it for processing
     df = get_soc_data2()
-
-    # Merge rates and solar data
     df_solar_resampled = get_solar_data()
     df_merged = pd.merge(df, df_rates_expanded, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_solar_resampled, on="timestamp", how="outer")
-    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
+    df_merged.ffill(inplace=True)
 
     model = train_model(df_merged)
 
-    # Define thresholds and parameters
-    min_charge_soc = 20  # Minimum SOC to start charging
-    max_discharge_soc = 80  # Maximum SOC to start discharging
-    charge_cost_threshold = 20  # Cost threshold for grid charging
-
-    start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
-    end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
-
+    # Initialize variables for predictions and actions
     predictions = {}
     actions = {}
-    prev_soc = None
+    total_charge_cost_pence = 0.0
 
-    current_time = start_timestamp
+    # Iterate through each time period
+    current_time = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+    end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
     while current_time < end_timestamp:
-        print(f"Processing for timestamp: {current_time}")
         matching_data = df_merged[df_merged["timestamp"] == pd.Timestamp(current_time)]
 
         if not matching_data.empty:
             row = matching_data.iloc[0]
-            print(f"Matching data found for timestamp {current_time}: {row}")
 
-            # Get the cost for the current timestamp from df_rates
-            rate_matching = df_rates_expanded[(df_rates_expanded['timestamp'] >= current_time) & (df_rates_expanded['timestamp'] < current_time + timedelta(minutes=15))]
-            current_rate = rate_matching['Cost'].iloc[0] if not rate_matching.empty else 0
+            # Get current SOC from the database
+            current_soc = row["soc"]
 
+            # Extract necessary data for decision making
+            solar_generation = row.get("pv_estimate", 0) / 2  # Solar data in kWh for 15 minutes
+            net_grid_usage = row["grid_data"] - solar_generation  # Net grid usage in kWh
+            current_rate = row.get("Cost", 0)
+
+            # Predict SOC using the model
             features = {
                 "minute_of_day": current_time.minute + current_time.hour * 60,
                 "hour_of_day": current_time.hour,
                 "day_of_week": current_time.weekday(),
                 "Cost": current_rate,
-                "grid_data": row["grid_data"],
+                "grid_data": net_grid_usage,
             }
-
-            # Predict SOC
             predicted_soc = model.predict(pd.DataFrame([features]))[0]
-            predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
+            predicted_soc = max(10, min(predicted_soc, 100))  # Ensure SOC is within valid range
 
-            # Handle solar data
-            solar_generation = row.get("pv_estimate", 0) / 2  # Treat missing data as 0
-            net_grid_usage = row["grid_data"] - solar_generation * 1000  # Convert kWh to W
-
-            # Enhanced decision logic with solar consideration
-            if solar_generation > 0:
-                if predicted_soc < max_discharge_soc:
-                    action = 'Charge with Solar'  # Charging with solar
-                elif net_grid_usage > 0 and predicted_soc > min_charge_soc:
-                    action = 'Discharge with Solar'  # Discharging while using solar for load
-                else:
-                    action = 'Export Solar'  # Exporting excess solar, covering house load
-            elif predicted_soc < min_charge_soc or (predicted_soc < 100 and current_rate < charge_cost_threshold):
-                action = 'Charge from Grid'  # Charging from the grid
-            elif predicted_soc > min_charge_soc and current_rate >= charge_cost_threshold:
-                action = 'Discharge'  # Discharging to grid/house
+            # Decision logic for battery management
+            if solar_generation > 0 and current_soc < MAX_DISCHARGE_SOC:
+                action = 'Charge with Solar'
+            elif solar_generation > 0 and net_grid_usage > 0 and current_soc > MIN_CHARGE_SOC:
+                action = 'Discharge with Solar'
+            elif solar_generation > 0 and current_soc == 100:
+                action = 'Export Solar'
+            elif current_soc < MIN_CHARGE_SOC or (current_soc < 100 and current_rate < CHARGE_COST_THRESHOLD):
+                action = 'Charge from Grid'
+                total_charge_cost_pence += current_rate * solar_generation * 1000  # Assuming rate is in pence per kWh
+            elif current_soc > MIN_CHARGE_SOC and current_rate >= CHARGE_COST_THRESHOLD:
+                action = 'Discharge'
             else:
-                action = 'Hold'  # Holding the current SOC
+                action = 'Hold'
 
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
             actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
-            prev_soc = predicted_soc
 
         else:
             print(f"No matching data for timestamp {current_time}")
 
         current_time += timedelta(minutes=15)
+
+    total_charge_cost_pounds = total_charge_cost_pence / 100
+    print(f"Total estimated charge cost: £{total_charge_cost_pounds:.2f}")
 
     return predictions, actions
 
@@ -223,6 +223,7 @@ def on_message(client, userdata, msg):
 
         predictions, actions = predict_soc_for_day(start_date, end_date, df_rates_expanded)
         client.publish("battery_soc/response", json.dumps({"predictions": predictions, "actions": actions}))
+
 
 def on_disconnect(client, userdata, rc):
     print("FROM PREDICT Disconnected with result code " + str(rc))

@@ -75,18 +75,29 @@ def train_model(df):
 
 def prepare_data():
     df_soc = get_soc_data()
+    print("Headers after loading SOC data:", df_soc.columns.tolist())
+    
     df_grid = get_grid_data()
-    df_solar = get_solar_data()
-    df_rates = get_rates_data()  # Function to fetch rates data
+    print("Headers after loading Grid data:", df_grid.columns.tolist())
 
+    df_solar = get_solar_data()
     # Change 'datetime' to 'timestamp' in df_solar for consistent merging
     df_solar = df_solar.rename(columns={"datetime": "timestamp"})
+    print("Headers after loading Solar data:", df_solar.columns.tolist())
+
+    df_rates = get_rates_data()  # Function to fetch rates data
+    print("Headers after loading Rates data:", df_rates.columns.tolist())
 
     # Merge and preprocess data
     df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
+    print("Headers after merging SOC and Grid data:", df_merged.columns.tolist())
+
     df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
+    print("Headers after adding Solar data:", df_merged.columns.tolist())
+
     df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
     df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
+    print("Headers after final merge with Rates data:", df_merged.columns.tolist())
 
     # Corrected attribute access
     df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
