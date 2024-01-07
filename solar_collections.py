@@ -39,9 +39,15 @@ def on_message(client, userdata, msg):
         conn = sqlite3.connect(DATABASE_FILENAME)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO grid_data (timestamp, grid_data) VALUES (?, ?)",
-            (timestamp, grid),
+        """
+        INSERT INTO grid_data (timestamp, grid_value)
+        VALUES (?, ?)
+        ON CONFLICT(timestamp) 
+        DO UPDATE SET grid_value = excluded.grid_value
+        """,
+        (timestamp_value, grid_value)
         )
+
         conn.commit()
         conn.close()
 
