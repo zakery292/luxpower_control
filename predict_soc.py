@@ -18,6 +18,7 @@ def get_soc_data2():
     print("FROM PREDICT Loading data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
 
+
     # Load and resample SOC data to 15-minute intervals
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
     df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
@@ -90,24 +91,15 @@ def train_model(df):
 
     return model
 
-
 def get_solar_data():
     print("Loading solar data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
-    df_solar = pd.read_sql_query("SELECT datetime, pv_estimate FROM solar", conn)
+    df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
     df_solar["timestamp"] = pd.to_datetime(df_solar["datetime"])
-    df_solar = df_solar.drop(columns=['datetime'])  # Drop the original datetime column
-    df_solar.set_index("timestamp", inplace=True)
-
-    # Ensure pv_estimate is numeric
-    df_solar['pv_estimate'] = pd.to_numeric(df_solar['pv_estimate'], errors='coerce')
-    
-    # Resample and compute mean only for numeric columns
-    df_solar_resampled = df_solar.resample("15T").mean().reset_index()
-
-    # Round the timestamps to the nearest 15 minutes
+    df_solar_resampled = df_solar.set_index("timestamp").resample("15T").mean().reset_index()
     df_solar_resampled['timestamp'] = df_solar_resampled['timestamp'].dt.round('15T')
     return df_solar_resampled
+
 
 
 def predict_soc_for_day(start_date, end_date, df_rates_expanded):
@@ -123,12 +115,10 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
         df['Cost'] = 0
 
     df_solar_resampled = get_solar_data()
-    # Merge df with df_solar_resampled
     df_merged = pd.merge(df, df_solar_resampled, on="timestamp", how="outer")
     df_merged.ffill(inplace=True)  # Forward fill to handle NaN
 
-
-    model = train_model(df)
+    model = train_model(df_merged)
 
     # Convert start and end dates to datetime objects
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
@@ -139,26 +129,23 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     predictions = {}
     actions = {}
     prev_soc = None  # Variable to store the previous SOC value
-    
+
     min_charge_soc = 20  # Minimum SOC to start charging
     max_discharge_soc = 80  # Maximum SOC to start discharging
+    charge_cost_threshold = ... # Define a threshold for charging cost
+
     current_time = start_timestamp
     while current_time < end_timestamp:
         print(f"Processing for timestamp: {current_time}")
-        matching_data = df[df["timestamp"] == pd.Timestamp(current_time)]
+        matching_data = df_merged[df_merged["timestamp"] == pd.Timestamp(current_time)]
 
         if not matching_data.empty:
             row = matching_data.iloc[0]
             print(f"Matching data found for timestamp {current_time}: {row}")
-            
+
             # Get the cost for the current timestamp from df_rates
             rate_matching = df_rates_expanded[(df_rates_expanded['timestamp'] >= current_time) & (df_rates_expanded['timestamp'] < current_time + timedelta(minutes=15))]
-            if rate_matching.empty:
-                print(f"No rate data found for timestamp {current_time}")
-                current_rate = None
-            else:
-                current_rate = rate_matching['Cost'].iloc[0]
-                print(f"Current rate for timestamp {current_time}: {current_rate}")
+            current_rate = rate_matching['Cost'].iloc[0] if not rate_matching.empty else 0
 
             features = {
                 "minute_of_day": current_time.minute + current_time.hour * 60,
@@ -168,36 +155,42 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
                 "grid_data": row["grid_data"],
             }
 
-            solar_generation = row["pv_estimate"] / 2  # Halve the 30 min kWh value for 15 min
+            # Predict the SOC
+            predicted_soc = model.predict(pd.DataFrame([features]))[0]
+            predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
+
+            # Handle solar data
+            solar_generation = row.get("pv_estimate", 0) / 2  # Treat missing data as 0
             net_grid_usage = row["grid_data"] - solar_generation * 1000  # Convert kWh to W
 
-            # Adjusted decision logic with solar and charging considerations
-            if net_grid_usage < 0 and predicted_soc < max_discharge_soc:  # Excess solar
-                action = 'Charge with Solar'
+            # Enhanced decision logic
+            if solar_generation > 0:
+                if predicted_soc < max_discharge_soc:
+                    action = 'Charge with Solar'  # Charging with solar
+                elif net_grid_usage > 0 and predicted_soc > min_charge_soc:
+                    action = 'Discharge with Solar'  # Discharging while using solar for load
+                else:
+                    action = 'Export Solar'  # Exporting excess solar, covering house load
             elif predicted_soc < min_charge_soc or (predicted_soc < 100 and current_rate < charge_cost_threshold):
-                action = 'Charge'
+                action = 'Charge from Grid'  # Charging from the grid
             elif predicted_soc > min_charge_soc and current_rate >= charge_cost_threshold:
-                action = 'Discharge'
+                action = 'Discharge'  # Discharging to grid/house
             else:
-                action = 'Hold'
+                action = 'Hold'  # Holding the current SOC
 
-            
-            print(f"Action for {current_time}: {action}")
+            predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
             actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
-            prev_soc = predicted_soc  # Update previous SOC for the next iteration
-    
-
-            actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
+            prev_soc = predicted_soc
 
         else:
             print(f"No matching data for timestamp {current_time}")
 
         current_time += timedelta(minutes=15)
+
     total_charge_cost_pounds = total_charge_cost_pence / 100
     print(f"Total estimated charge cost for the period: £{total_charge_cost_pounds:.2f}")
 
     return predictions, actions
-
 
 
 
