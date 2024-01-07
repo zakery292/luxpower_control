@@ -161,12 +161,22 @@ def on_message(client, userdata, msg):
         df_soc, df_grid = get_past_data()
         df_solar, df_rates = get_future_data(start_date, end_date)
 
-        # Train the model using past data
-        df_past = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
-        model = train_model(df_past)
+        # Merge the dataframes
+        df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
+        df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
+        df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
+        df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
 
-        # Predict SOC using a combination of past and future data
-        predictions = predict_soc_for_day(start_date, end_date, model, df_soc, df_grid, df_solar, df_rates)
+        # Add necessary time columns
+        df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
+        df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
+        df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday()
+
+        # Train the model
+        model = train_model(df_merged)
+
+        # Predict SOC
+        predictions = predict_soc_for_day(start_date, end_date, model, df_merged)
         client.publish("battery_soc/response", json.dumps({"predictions": predictions}))
 
 def on_disconnect(client, userdata, rc):
