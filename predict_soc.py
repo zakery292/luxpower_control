@@ -85,6 +85,19 @@ def predict_soc_for_day(start_date, end_date, model, df):
     return predictions
 
 # MQTT Client Functions
+
+def get_mqtt_config():
+    config_path = '/data/options.json'
+    try:
+        with open(config_path, 'r') as file:
+            config = json.load(file)
+        return config['mqtt_host'], int(config['mqtt_port']), config['mqtt_user'], config['mqtt_password']
+    except Exception as e:
+        print(f"Error reading MQTT configuration: {e}")
+        # Default values if the configuration file is not found or there's an error
+        return '192.168.1.135', 1883, 'default_user', 'default_password'
+
+
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
     client.subscribe("battery_soc/request")
