@@ -16,9 +16,9 @@ def get_soc_data():
     conn = sqlite3.connect(DATABASE_FILENAME)
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
     df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
-    df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
+    df_soc_resampled = df_soc.set_index("timestamp").resample("15T").ffill().bfill().reset_index()
     print("SOC data headers:", df_soc_resampled.columns.tolist())
-    print(df_soc_resampled.head(4))  # Print first 4 rows
+    print(df_soc_resampled.head(4))
     return df_soc_resampled
 
 def get_grid_data():
@@ -28,7 +28,7 @@ def get_grid_data():
     df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
     df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
     print("Grid data headers:", df_grid_resampled.columns.tolist())
-    print(df_grid_resampled.head(4))  # Print first 4 rows
+    print(df_grid_resampled.head(4))
     return df_grid_resampled
 
 def get_solar_data():
@@ -37,26 +37,20 @@ def get_solar_data():
     df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
     df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
     df_solar_resampled = df_solar.set_index("datetime").resample("15T").mean().reset_index()
-    print("Solar data headers:", df_solar_resampled.columns.tolist())
+    df_solar_resampled['pv_estimate'] = df_solar_resampled['pv_estimate'].ffill().div(2)
     df_solar_resampled = df_solar_resampled.rename(columns={"datetime": "timestamp"})
-    print(df_solar_resampled.head(4))  # Print first 4 rows
+    print("Solar data headers:", df_solar_resampled.columns.tolist())
+    print(df_solar_resampled.head(4))
     return df_solar_resampled
-
 
 def get_rates_data():
     print("Loading rates data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
-
-    # Query to select data from rates table
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
-
-    # Ensure that 'Date' is a datetime object and 'Cost' is numeric
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
     df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
     df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
     df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
-
-    # Expand rates data to 15-minute intervals
     expanded_rates = []
     for _, row in df_rates.iterrows():
         start_time = datetime.combine(row["Date"], row["StartTime"])
@@ -64,9 +58,8 @@ def get_rates_data():
         while start_time < end_time:
             expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
             start_time += timedelta(minutes=15)
-    
     df_rates_expanded = pd.DataFrame(expanded_rates)
-    print(df_rates_expanded.head(4))  #
+    print(df_rates_expanded.head(4))
     return df_rates_expanded
 
 def train_model(df):
