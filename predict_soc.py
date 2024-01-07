@@ -98,18 +98,7 @@ def train_model(df):
     return model
 
 
-def predict_soc_for_day(start_date, end_date, model, df_soc, df_grid, df_solar, df_rates):
-    # Merge past data (SOC and Grid) with future data (Solar and Rates)
-    df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
-    df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
-    df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
-    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
-
-    # Add necessary time columns for the model
-    df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
-    df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
-    df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday()
-
+def predict_soc_for_day(start_date, end_date, model, df_merged):
     # Predict SOC
     predictions = {}
     current_time = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
