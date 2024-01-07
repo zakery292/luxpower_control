@@ -37,7 +37,7 @@ def get_solar_data():
     df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
     df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
     df_solar_resampled = df_solar.set_index("datetime").resample("15T").mean().reset_index()
-    df_solar_resampled['pv_estimate'] = df_solar_resampled['pv_estimate'].ffill().div(2)
+    df_solar_resampled['pv_estimate'] = df_solar_resampled['pv_estimate'].div(2)
     df_solar_resampled = df_solar_resampled.rename(columns={"datetime": "timestamp"})
     print("Solar data headers:", df_solar_resampled.columns.tolist())
     print(df_solar_resampled.head(4))
