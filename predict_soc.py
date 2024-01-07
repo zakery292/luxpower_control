@@ -123,7 +123,8 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
         df['Cost'] = 0
 
     df_solar_resampled = get_solar_data()
-    df_merged = pd.merge(df_merged, df_solar_resampled, on="timestamp", how="outer")
+    # Merge df with df_solar_resampled
+    df_merged = pd.merge(df, df_solar_resampled, on="timestamp", how="outer")
     df_merged.ffill(inplace=True)  # Forward fill to handle NaN
 
 
