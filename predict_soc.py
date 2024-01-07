@@ -31,26 +31,36 @@ def get_grid_data():
     print(df_grid_resampled.head(4))
     return df_grid_resampled
 
-def get_solar_data():
+def get_solar_data(start_date, end_date):
     print("Loading Solar data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
     df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
     df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
+    
+    # Filter the data for the specified date range
+    df_solar = df_solar[(df_solar['datetime'] >= start_date) & (df_solar['datetime'] <= end_date)]
+    
     df_solar_resampled = df_solar.set_index("datetime").resample("15T").mean().reset_index()
-    df_solar_resampled['pv_estimate'] = df_solar_resampled['pv_estimate'].div(2)
+    df_solar_resampled['pv_estimate'] = df_solar_resampled['pv_estimate'].fillna(0).div(2)
     df_solar_resampled = df_solar_resampled.rename(columns={"datetime": "timestamp"})
     print("Solar data headers:", df_solar_resampled.columns.tolist())
     print(df_solar_resampled.head(4))
     return df_solar_resampled
 
-def get_rates_data():
+def get_rates_data(start_date, end_date):
     print("Loading rates data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
+
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
+
+    # Filter the data for the specified date range
+    df_rates = df_rates[(df_rates['Date'] >= start_date) & (df_rates['Date'] <= end_date)]
+
     df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
     df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
     df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
+
     expanded_rates = []
     for _, row in df_rates.iterrows():
         start_time = datetime.combine(row["Date"], row["StartTime"])
@@ -58,9 +68,11 @@ def get_rates_data():
         while start_time < end_time:
             expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
             start_time += timedelta(minutes=15)
+    
     df_rates_expanded = pd.DataFrame(expanded_rates)
     print(df_rates_expanded.head(4))
     return df_rates_expanded
+
 
 def train_model(df):
     print("Starting model training...")
@@ -77,49 +89,27 @@ def train_model(df):
     print("Model evaluation - Mean Squared Error:", mse)
     return model
 
-def prepare_data():
-    df_soc = get_soc_data()
-    print("Headers after loading SOC data:", df_soc.columns.tolist())
-    
-    df_grid = get_grid_data()
-    print("Headers after loading Grid data:", df_grid.columns.tolist())
 
-    df_solar = get_solar_data()
-    # Change 'datetime' to 'timestamp' in df_solar for consistent merging
-    df_solar = df_solar.rename(columns={"datetime": "timestamp"})
-    print("Headers after loading Solar data:", df_solar.columns.tolist())
-
-    df_rates = get_rates_data()  # Function to fetch rates data
-    print("Headers after loading Rates data:", df_rates.columns.tolist())
-
-    # Merge and preprocess data
-    df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
-    print("Headers after merging SOC and Grid data:", df_merged.columns.tolist())
-
-    df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
-    print("Headers after adding Solar data:", df_merged.columns.tolist())
-
-    df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
-    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
-    print("Headers after final merge with Rates data:", df_merged.head(4))
-
-    # Corrected attribute access
-    df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
-    df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
-    df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday
-
-    return df_merged
-
-
-def predict_soc_for_day(start_date, end_date, model, df):
+def predict_soc_for_day(start_date, end_date, model, df_soc, df_grid):
     print("Predicting SOC for the day...")
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
+    # Fetch solar and rates data for the specified date range
+    df_solar = get_solar_data(start_date, end_date)
+    df_rates = get_rates_data(start_date, end_date)
+
+    # Merge all data
+    df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
+    df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
+    df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
+    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
+    print("Headers after final merge with Rates data:", df_merged.head(4))
+
     predictions = {}
     current_time = start_timestamp
     while current_time < end_timestamp:
-        matching_rows = df[df["timestamp"] == current_time]
+        matching_rows = df_merged[df_merged["timestamp"] == current_time]
         if not matching_rows.empty:
             row = matching_rows.iloc[0]
             features = {
@@ -162,9 +152,21 @@ def on_message(client, userdata, msg):
     start_date = request_data.get("start_date")
     end_date = request_data.get("end_date")
     if start_date and end_date:
-        df = prepare_data()
-        model = train_model(df)
-        predictions = predict_soc_for_day(start_date, end_date, model, df)
+        # Fetch data
+        df_soc = get_soc_data()
+        df_grid = get_grid_data()
+        df_solar = get_solar_data(start_date, end_date)  # Now accepts start and end date
+        df_rates = get_rates_data(start_date, end_date)  # Now accepts start and end date
+
+        # Train the model with the merged data
+        df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
+        df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
+        df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
+        df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
+        model = train_model(df_merged)
+
+        # Predict SOC for the specified date range
+        predictions = predict_soc_for_day(start_date, end_date, model, df_soc, df_grid)
         client.publish("battery_soc/response", json.dumps({"predictions": predictions}))
 
 def on_disconnect(client, userdata, rc):
