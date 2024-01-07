@@ -88,8 +88,8 @@ def train_model(df):
     X = df[features]
     y = df["soc"]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.6, random_state=120)
-    model = HistGradientBoostingRegressor(random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=50)
+    model = HistGradientBoostingRegressor(random_state=43, max_iter=1000, max_leaf_nodes=1000)
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
