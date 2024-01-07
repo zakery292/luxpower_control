@@ -95,10 +95,21 @@ def get_solar_data():
     print("Loading solar data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
     df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
-    df_solar["timestamp"] = pd.to_datetime(df_solar["datetime"])
-    df_solar_resampled = df_solar.set_index("timestamp").resample("15T").mean().reset_index()
-    df_solar_resampled['timestamp'] = df_solar_resampled['timestamp'].dt.round('15T')
+
+    # Convert 'datetime' to a pandas datetime object
+    df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
+
+    # Ensure that 'pv_estimate' is numeric
+    df_solar["pv_estimate"] = pd.to_numeric(df_solar["pv_estimate"], errors='coerce')
+
+    # Set 'datetime' as the index and resample
+    df_solar_resampled = df_solar.set_index("datetime").resample("15T").mean().reset_index()
+
+    # Round the timestamps to the nearest 15 minutes
+    df_solar_resampled['timestamp'] = df_solar_resampled['datetime'].dt.round('15T')
+
     return df_solar_resampled
+
 
 
 
