@@ -1,128 +1,198 @@
+# File: predict_soc_for_day_mqtt.py
+
 import json
 import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta
 import pandas as pd
 import sqlite3
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+import numpy as np
+import os
 
-# Constants
 DATABASE_FILENAME = "/config/soc_database.db"
 
-# Functions to load data from the database
-def get_past_data():
-    print("Loading Grid data from database...")
-    conn = sqlite3.connect(DATABASE_FILENAME)
-    df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
-    df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
-    df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
-    print("Grid data headers:", df_grid_resampled.columns.tolist())
-    print(df_grid_resampled.head(4))
-    
 
-    print("Loading SOC data from database...")
+def get_soc_data2():
+    print("FROM PREDICT Loading data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
+
+    # Load SOC data and resample to 30-minute intervals
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
-    df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
-    df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
-    print("SOC data headers:", df_soc_resampled.columns.tolist())
-    print(df_soc_resampled.head(4))  # Print first 4 rows
-    return df_soc_resampled, df_grid_resampled
+    df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"], format="mixed")
+    df_soc["minute_of_day"] = df_soc[
+        "timestamp"
+    ].dt.minute  # Create minute_of_day column
+    df_soc["hour_of_day"] = df_soc["timestamp"].dt.hour  # Create hour_of_day column
+    df_soc["day_of_week"] = df_soc["timestamp"].dt.dayofweek
+    df_soc.ffill(inplace=True)  # Create day_of_week column
+    df_soc_resampled = (
+        df_soc.set_index("timestamp").resample("30T").mean().reset_index()
+    )
+    print(" FROM PREDICT  SOC data loaded and resampled.")
+    print(df_soc_resampled.head())
+    # Load Grid data and resample to 30-minute intervals
+    df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
+    df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"], format="mixed")
 
-
-def get_future_data(start_date, end_date):
-    df_solar = get_solar_data(start_date, end_date)
-
-    return df_solar
-
-def get_solar_data(start_date, end_date):
-    print("Loading Solar data from database...")
-    conn = sqlite3.connect(DATABASE_FILENAME)
-    df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
-
-    # Convert 'datetime' to the appropriate format
-    df_solar['datetime'] = pd.to_datetime(df_solar['datetime'], format='%d/%m/%Y %H:%M')
-
-    # Filter data based on the requested date range
-    df_solar = df_solar[(df_solar['datetime'] >= start_date) & (df_solar['datetime'] <= end_date)]
-
-    # Resample and fill missing values
-    df_solar_resampled = df_solar.set_index('datetime').resample('15T').ffill().reset_index()
-    df_solar_resampled = df_solar_resampled.rename(columns={'datetime': 'timestamp'})
-
-    print("Solar data headers:", df_solar_resampled.columns.tolist())
-    print(df_solar_resampled.head(4))  # Print first 4 rows
-    return df_solar_resampled
-
-def get_rates_data(start_date, end_date):
-    print("Loading rates data from database...")
-    conn = sqlite3.connect(DATABASE_FILENAME)
-
+    # Ensure grid_data is numeric
+    df_grid["grid_data"] = pd.to_numeric(df_grid["grid_data"], errors="coerce")
+    df_soc.ffill(inplace=True)
+    df_grid_resampled = (
+        df_grid.set_index("timestamp").resample("30T").mean().reset_index()
+    )
+    print(" FROM PREDICT  Grid data loaded and resampled.")
+    print(df_grid_resampled.head())
+    # Load Rates data
     df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
     df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
+    df_rates["StartTime"] = pd.to_datetime(
+        df_rates["StartTime"], format="%H:%M:%S"
+    ).dt.time
+    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S").dt.time
+    df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
+    print(" FROM PREDICT Rates data loaded.")
+    print(df_rates.head())
+    # Merge SOC and Grid data
+    df_merged = pd.merge(
+        df_soc_resampled, df_grid_resampled, on="timestamp", how="outer"
+    )
+    print("FROM PREDICT SOC and Grid data merged.")
+    print(df_merged.head())
 
-    # Filter the data for the specified date range
-    df_rates = df_rates[(df_rates['Date'] >= start_date) & (df_rates['Date'] <= end_date)]
+    # Function to find the matching rate for each timestamp
+    def get_rate_for_timestamp(row):
+        rate_row = df_rates[
+            (df_rates["StartTime"] <= row["timestamp"].time())
+            & (df_rates["EndTime"] > row["timestamp"].time())
+        ]
+        return rate_row["Cost"].iloc[0] if not rate_row.empty else np.nan
 
-    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
-    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
-    df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
+    # Apply the function to get rates
+    df_merged["Cost"] = df_merged.apply(get_rate_for_timestamp, axis=1)
+    print("FROM PREDICT Merged SOC, Grid, and Rates data.")
+    print(df_merged.head())
 
-    expanded_rates = []
-    for _, row in df_rates.iterrows():
-        start_time = datetime.combine(row["Date"], row["StartTime"])
-        end_time = datetime.combine(row["Date"], row["EndTime"])
-        while start_time < end_time:
-            expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
-            start_time += timedelta(minutes=15)
-    
-    df_rates_expanded = pd.DataFrame(expanded_rates)
-    print(df_rates_expanded.head(4))
-    return df_rates_expanded
+    # Add minute_of_day, hour_of_day, and day_of_week columns
+    df_merged["minute_of_day"] = df_merged["timestamp"].dt.minute
+    df_merged["hour_of_day"] = df_merged["timestamp"].dt.hour
+    df_merged["day_of_week"] = df_merged["timestamp"].dt.dayofweek
+
+    # Handle missing values using forward fill
+    df_merged.ffill(inplace=True)
+    print("FROM PREDICT  NaN values handled.")
+
+    return df_merged
 
 
 def train_model(df):
-    print("Starting model training...")
-    features = ["minute_of_day", "hour_of_day", "day_of_week", "grid_data", "pv_estimate"]
+    print(" FROM PREDICT Starting model training...")
+    features = ["minute_of_day", "hour_of_day", "day_of_week", "Cost", "grid_data"]
     X = df[features]
     y = df["soc"]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=50)
-    model = HistGradientBoostingRegressor(random_state=43, max_iter=1000, max_leaf_nodes=1000)
-    model.fit(X_train, y_train)
+    # Impute missing values with mean
+    imputer = SimpleImputer(strategy="mean")
 
-    y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-    print("Model evaluation - Mean Squared Error:", mse)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=65
+    )
+
+    # Create a pipeline with imputer and model
+    model = make_pipeline(
+        imputer, RandomForestRegressor(n_estimators=200, random_state=42)
+    )
+    model.fit(X_train, y_train)
     return model
 
 
-def predict_soc_for_day(start_date, end_date, model, df_merged):
-    # Predict SOC
+def predict_soc_for_day(target_date):
+    print("FROM PREDICT predict_soc_for_day called with target_date:", target_date)
+    df = get_soc_data2()
+    print("FROM PREDICT Data fetched from get_soc_data2")
+    model = train_model(df)
+    print("FROM PREDICT Model trained")
+
+    # Get rates data for the target date
+    conn = sqlite3.connect(DATABASE_FILENAME)
+    df_rates = pd.read_sql_query(
+        f"SELECT * FROM rates_data WHERE Date = '{target_date}'", conn
+    )
+    df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
+
+    # Get grid data for the target date
+    df_grid = pd.read_sql_query(
+        f"SELECT timestamp, grid_data FROM grid_data WHERE Date(timestamp) = '{target_date}'",
+        conn,
+    )
+    df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"], format="mixed")
+
+    start_time = datetime.strptime(target_date, "%Y-%m-%d")
+    end_time = start_time + timedelta(days=1)
+
     predictions = {}
-    current_time = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
-    end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
-    while current_time < end_timestamp:
-        matching_rows = df_merged[df_merged["timestamp"] == current_time]
-        if not matching_rows.empty:
-            row = matching_rows.iloc[0]
-            features = {
-                "minute_of_day": current_time.minute + current_time.hour * 60,
-                "hour_of_day": current_time.hour,
-                "day_of_week": current_time.weekday(),
-                "grid_data": row.get("grid_data", 0),
-                "pv_estimate": row.get("pv_estimate", 0)
-            }
-            predicted_soc = model.predict(pd.DataFrame([features]))[0]
-            predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = max(0, min(predicted_soc, 100))
+    current_time = start_time
+    while current_time < end_time:
+        target_minute = current_time.minute
+        target_hour = current_time.hour
+        target_day_of_week = current_time.weekday()
+
+        # Find the corresponding cost data for the current time
+        matching_rate = df_rates[
+            (df_rates["StartTime"] <= current_time.time())
+            & (df_rates["EndTime"] > current_time.time())
+        ]
+        if not matching_rate.empty:
+            cost = matching_rate.iloc[0]["Cost"]
         else:
-            predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = None
+            cost = 0  # Default value if no matching rate is found
+
+        # Find the corresponding grid data for the current time
+        matching_grid = df_grid[df_grid["timestamp"] == current_time]
+        grid_data = matching_grid["grid_data"].iloc[0] if not matching_grid.empty else 0
+
+        # Construct the prediction input with all features
+        target_data = pd.DataFrame(
+            {
+                "minute_of_day": [target_minute],
+                "hour_of_day": [target_hour],
+                "day_of_week": [target_day_of_week],
+                "Cost": [cost],
+                "grid_data": [grid_data],
+            }
+        )
+        print("FROM PREDICT Predicting for timestamp:", current_time)
+        predicted_soc = model.predict(target_data)[0]
+        print("FROM PREDICT Prediction:", predicted_soc)
+        # Ensure SOC stays within 10-100% range
+        predicted_soc = max(10, min(predicted_soc, 100))
+        timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        predictions[timestamp] = {"date": timestamp, "soc": predicted_soc}
+
         current_time += timedelta(minutes=15)
 
     return predictions
 
-# MQTT Client Functions
+
+def on_connect(client, userdata, flags, rc):
+    print("FROM PREDICT Connected with result code " + str(rc))
+    client.subscribe("battery_soc/request")
+
+
+def on_message(client, userdata, msg):
+    request_data = json.loads(msg.payload)
+    target_date = request_data.get("target_date")
+    if target_date:
+        predictions = predict_soc_for_day(target_date)
+        client.publish("battery_soc/response", json.dumps(predictions))
+def on_disconnect(client, userdata, rc):
+    print("FROM PREDICT Disconnected with result code " + str(rc))
+
+
+def on_log(client, userdata, level, buf):
+    print("FROM PREDICT Log: ", buf)
 
 def get_mqtt_config():
     config_path = '/data/options.json'
@@ -135,56 +205,25 @@ def get_mqtt_config():
         # Default values if the configuration file is not found or there's an error
         return '192.168.1.135', 1883, 'default_user', 'default_password'
 
-
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
-    client.subscribe("battery_soc/request")
-
-def on_message(client, userdata, msg):
-    request_data = json.loads(msg.payload)
-    start_date = request_data.get("start_date")
-    end_date = request_data.get("end_date")
-    if start_date and end_date:
-        # Fetch past and future data
-        df_soc, df_grid = get_past_data()
-        df_solar = get_future_data(start_date, end_date)
-
-        # Merge the dataframes
-        df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
-        df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
-        df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
-
-        # Add necessary time columns
-        df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
-        df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
-        df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday
-
-        # Train the model
-        model = train_model(df_merged)
-
-        # Predict SOC
-        predictions = predict_soc_for_day(start_date, end_date, model, df_merged)
-        client.publish("battery_soc/response", json.dumps({"predictions": predictions}))
-
-def on_disconnect(client, userdata, rc):
-    print("Disconnected with result code " + str(rc))
-
-def on_log(client, userdata, level, buf):
-    print("Log:", buf)
-
-# MQTT Configuration and Client Setup
+# Get MQTT configuration
 mqtt_host, mqtt_port, mqtt_user, mqtt_password = get_mqtt_config()
+
+# Set up MQTT client
 client = mqtt.Client()
-client.username_pw_set(mqtt_user, password=mqtt_password)
+client.username_pw_set(mqtt_user, password=mqtt_password)  # Set username and password
 client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
+print(f'SOC COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
+print('This is from soc_collections.py')
 
+# Connect to MQTT broker
 try:
-    client.connect(mqtt_host, mqtt_port, 60)
+    client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
-    print(f"Failed to connect to MQTT broker: {e}")
+    print(f"SOC COLLECTIONS  Failed to connect to MQTT broker: {e}")
     exit(1)
 
+# Start the loop
 client.loop_forever()
