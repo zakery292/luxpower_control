@@ -4,117 +4,195 @@ from datetime import datetime, timedelta
 import pandas as pd
 import sqlite3
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import HistGradientBoostingRegressor
 import numpy as np
+from dateutil import parser
+from sklearn.metrics import mean_squared_error
 
-DATABASE_FILENAME = "soc_database.db"
+BATTERY_CAPACITY_KWH = 19.2  # Battery capacity in kWh
+CHARGE_DISCHARGE_RATE_W = 3800  
+DATABASE_FILENAME = "/config/soc_database.db"
 
 
 def get_soc_data2():
-    print("Loading data from database...")
+    print("FROM PREDICT Loading data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
 
-    # Load and process SOC data
+
+    # Load and resample SOC data to 15-minute intervals
     df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
-    df_soc["timestamp"] = pd.to_datetime(
-        df_soc["timestamp"], format="%Y-%m-%d %H:%M:%S"
-    )
-    df_soc["day_of_week"] = df_soc["timestamp"].dt.dayofweek
-    df_soc.set_index("timestamp", inplace=True)
-    df_soc = df_soc.resample("15T").mean().reset_index()
-    print("SOC data headers:", df_soc.columns.tolist())
+    df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
+    df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
+    print("SOC data headers:", df_soc_resampled.columns.tolist())
+    print(df_soc_resampled.head())
+    print("Unique timestamps in SOC data:", df_soc_resampled['timestamp'].unique())
 
-    # Load and process Grid data
+    # Load and resample Grid data to 15-minute intervals
     df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
-    df_grid["timestamp"] = pd.to_datetime(
-        df_grid["timestamp"], format="%Y-%m-%d %H:%M:%S"
-    )
-    df_grid.set_index("timestamp", inplace=True)
-    df_grid = df_grid.resample("15T").mean().reset_index()
-    print("Grid data headers:", df_grid.columns.tolist())
+    df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
+    df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
+    print("Grid data headers:", df_grid_resampled.columns.tolist())
+    print(df_grid_resampled.head())
+    print("Unique timestamps in Grid data:", df_grid_resampled['timestamp'].unique())
 
-    # Load and process Rates data
-    df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
-    df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
-    df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"], format="%H:%M:%S")
-    df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"], format="%H:%M:%S")
-    df_rates["Cost"] = df_rates["Cost"].str.rstrip("p").astype(float)
+    # Round the timestamps to the nearest 15 minutes in all DataFrames
+    df_soc_resampled['timestamp'] = df_soc_resampled['timestamp'].dt.round('15T')
+    print("SOC data after rounding timestamps:")
+    print(df_soc_resampled.head())
 
-    # Expanding rates to 15-minute intervals
-    expanded_rates = []
-    for _, row in df_rates.iterrows():
-        current_time = datetime.combine(row["Date"].date(), row["StartTime"].time())
-        end_time = datetime.combine(row["Date"].date(), row["EndTime"].time())
-        while current_time < end_time:
-            expanded_rates.append({"timestamp": current_time, "Cost": row["Cost"]})
-            current_time += timedelta(minutes=15)
+    df_grid_resampled['timestamp'] = df_grid_resampled['timestamp'].dt.round('15T')
+    print("Grid data after rounding timestamps:")
+    print(df_grid_resampled.head())
 
-    df_rates_expanded = pd.DataFrame(expanded_rates)
 
-    # Merge SOC, Grid, and Expanded Rates data
-    df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
-    df_merged = pd.merge(df_merged, df_rates_expanded, on="timestamp", how="outer")
+    # Merge the DataFrames
+    df_merged = pd.merge(df_soc_resampled, df_grid_resampled, on="timestamp", how="outer")
+    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
 
-    print("Merged data headers:", df_merged.columns.tolist())
+    print("Merged DataFrame with SOC, Grid, and Cost data:")
+    print(df_merged.head())
+        # Add these columns to the merged DataFrame
+    df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
+    df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
+    df_merged['day_of_week'] = df_merged['timestamp'].dt.dayofweek
+
+    print("Merged DataFrame with added columns for model training:")
+    print(df_merged.head())
+        
+
+
     return df_merged
+
 
 
 def train_model(df):
     print("Starting model training...")
+
+    # Include 'Cost' in the features
     features = ["minute_of_day", "hour_of_day", "day_of_week", "Cost", "grid_data"]
+    
+    # Check if 'Cost' is in the DataFrame and handle if it's not
+    if 'Cost' not in df.columns:
+        df['Cost'] = 0  # You might want to handle this differently based on your data
+    
     X = df[features]
     y = df["soc"]
 
-    imputer = SimpleImputer(strategy="mean")
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=0.2, random_state=60
     )
 
-    model = make_pipeline(
-        imputer, RandomForestRegressor(n_estimators=200, random_state=42)
-    )
+    model = HistGradientBoostingRegressor(random_state=42)
     model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    print("Model evaluation - Mean Squared Error: ", mse)
+
     return model
 
+def get_solar_data():
+    print("Loading solar data from database...")
+    conn = sqlite3.connect(DATABASE_FILENAME)
+    df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
 
-def predict_soc_for_day(start_date, end_date):
-    print(
-        "predict_soc_for_day called with start_date:", start_date, "end_date:", end_date
-    )
+    # Convert 'datetime' to a pandas datetime object
+    df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
+
+    # Ensure that 'pv_estimate' is numeric
+    df_solar["pv_estimate"] = pd.to_numeric(df_solar["pv_estimate"], errors='coerce')
+
+    # Set 'datetime' as the index and resample
+    df_solar_resampled = df_solar.set_index("datetime").resample("15T").mean().reset_index()
+
+    # Round the timestamps to the nearest 15 minutes
+    df_solar_resampled['timestamp'] = df_solar_resampled['datetime'].dt.round('15T')
+
+    return df_solar_resampled
+
+
+
+
+def predict_soc_for_day(start_date, end_date, df_rates_expanded):
+    print("predict_soc_for_day called with start_date:", start_date, "end_date:", end_date)
     df = get_soc_data2()
-    model = train_model(df)
+
+    # Merge rates and solar data
+    df_solar_resampled = get_solar_data()
+    df_merged = pd.merge(df, df_rates_expanded, on="timestamp", how="outer")
+    df_merged = pd.merge(df_merged, df_solar_resampled, on="timestamp", how="outer")
+    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
+
+    model = train_model(df_merged)
+
+    # Define thresholds and parameters
+    min_charge_soc = 20  # Minimum SOC to start charging
+    max_discharge_soc = 80  # Maximum SOC to start discharging
+    charge_cost_threshold = 20  # Cost threshold for grid charging
 
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
     predictions = {}
+    actions = {}
+    prev_soc = None
+
     current_time = start_timestamp
     while current_time < end_timestamp:
-        matching_data = df[df["timestamp"] == current_time]
+        print(f"Processing for timestamp: {current_time}")
+        matching_data = df_merged[df_merged["timestamp"] == pd.Timestamp(current_time)]
 
         if not matching_data.empty:
             row = matching_data.iloc[0]
+            print(f"Matching data found for timestamp {current_time}: {row}")
+
+            # Get the cost for the current timestamp from df_rates
+            rate_matching = df_rates_expanded[(df_rates_expanded['timestamp'] >= current_time) & (df_rates_expanded['timestamp'] < current_time + timedelta(minutes=15))]
+            current_rate = rate_matching['Cost'].iloc[0] if not rate_matching.empty else 0
+
             features = {
                 "minute_of_day": current_time.minute + current_time.hour * 60,
                 "hour_of_day": current_time.hour,
                 "day_of_week": current_time.weekday(),
-                "Cost": row["Cost"],
+                "Cost": current_rate,
                 "grid_data": row["grid_data"],
             }
 
-            target_data = pd.DataFrame([features])
-            predicted_soc = model.predict(target_data)[0]
-            predicted_soc = max(
-                10, min(predicted_soc, 100)
-            )  # Ensuring SOC is within bounds
+            # Predict SOC
+            predicted_soc = model.predict(pd.DataFrame([features]))[0]
+            predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
+
+            # Handle solar data
+            solar_generation = row.get("pv_estimate", 0) / 2  # Treat missing data as 0
+            net_grid_usage = row["grid_data"] - solar_generation * 1000  # Convert kWh to W
+
+            # Enhanced decision logic with solar consideration
+            if solar_generation > 0:
+                if predicted_soc < max_discharge_soc:
+                    action = 'Charge with Solar'  # Charging with solar
+                elif net_grid_usage > 0 and predicted_soc > min_charge_soc:
+                    action = 'Discharge with Solar'  # Discharging while using solar for load
+                else:
+                    action = 'Export Solar'  # Exporting excess solar, covering house load
+            elif predicted_soc < min_charge_soc or (predicted_soc < 100 and current_rate < charge_cost_threshold):
+                action = 'Charge from Grid'  # Charging from the grid
+            elif predicted_soc > min_charge_soc and current_rate >= charge_cost_threshold:
+                action = 'Discharge'  # Discharging to grid/house
+            else:
+                action = 'Hold'  # Holding the current SOC
 
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = predicted_soc
+            actions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = action
+            prev_soc = predicted_soc
+
+        else:
+            print(f"No matching data for timestamp {current_time}")
 
         current_time += timedelta(minutes=15)
 
-    return predictions
+    return predictions, actions
+
+
 
 
 def on_connect(client, userdata, flags, rc):
@@ -124,10 +202,28 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     request_data = json.loads(msg.payload)
-    target_date = request_data.get("target_date")
-    if target_date:
-        predictions = predict_soc_for_day(target_date)
-        client.publish("battery_soc/response", json.dumps(predictions))
+    start_date = request_data.get("start_date")
+    end_date = request_data.get("end_date")
+    if start_date and end_date:
+        conn = sqlite3.connect(DATABASE_FILENAME)
+        df_rates = pd.read_sql_query("SELECT * FROM rates_data", conn)
+        df_rates["Date"] = pd.to_datetime(df_rates["Date"], format="%d-%m-%Y")
+        df_rates["StartTime"] = pd.to_datetime(df_rates["StartTime"]).dt.time
+        df_rates["EndTime"] = pd.to_datetime(df_rates["EndTime"]).dt.time
+        df_rates["Cost"] = pd.to_numeric(df_rates["Cost"].str.rstrip("p"), errors='coerce')
+
+        expanded_rates = []
+        for _, row in df_rates.iterrows():
+            start_time = datetime.combine(row["Date"], row["StartTime"])
+            end_time = datetime.combine(row["Date"], row["EndTime"])
+            while start_time < end_time:
+                expanded_rates.append({"timestamp": start_time, "Cost": row["Cost"]})
+                start_time += timedelta(minutes=15)
+        df_rates_expanded = pd.DataFrame(expanded_rates)
+
+        predictions, actions = predict_soc_for_day(start_date, end_date, df_rates_expanded)
+        client.publish("battery_soc/response", json.dumps({"predictions": predictions, "actions": actions}))
+
 def on_disconnect(client, userdata, rc):
     print("FROM PREDICT Disconnected with result code " + str(rc))
 
@@ -156,14 +252,14 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 client.on_log = on_log
-print(f'SOC COLLECTIONS  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
-print('This is from soc_collections.py')
+print(f'SOC PREDICT  Connecting to MQTT Broker at {mqtt_host}:{mqtt_port} with username {mqtt_user}')
+print('This is from predict_soc.py')
 
 # Connect to MQTT broker
 try:
     client.connect(mqtt_host, mqtt_port, 60)  # Use variables for host and port
 except Exception as e:
-    print(f"SOC COLLECTIONS  Failed to connect to MQTT broker: {e}")
+    print(f"SOC PREDICT Failed to connect to MQTT broker: {e}")
     exit(1)
 
 # Start the loop
