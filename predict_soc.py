@@ -143,8 +143,7 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
 
     min_charge_soc = 20  # Minimum SOC to start charging
     max_discharge_soc = 80  # Maximum SOC to start discharging
-    charge_cost_threshold = ... # Define a threshold for charging cost
-
+    charge_cost_threshold = 20
     current_time = start_timestamp
     while current_time < end_timestamp:
         print(f"Processing for timestamp: {current_time}")
