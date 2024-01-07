@@ -11,6 +11,31 @@ from sklearn.metrics import mean_squared_error
 DATABASE_FILENAME = "/config/soc_database.db"
 
 # Functions to load data from the database
+def get_past_data():
+    print("Loading Grid data from database...")
+    conn = sqlite3.connect(DATABASE_FILENAME)
+    df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
+    df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
+    df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
+    print("Grid data headers:", df_grid_resampled.columns.tolist())
+    print(df_grid_resampled.head(4))
+    
+
+    print("Loading SOC data from database...")
+    conn = sqlite3.connect(DATABASE_FILENAME)
+    df_soc = pd.read_sql_query("SELECT * FROM soc_data", conn)
+    df_soc["timestamp"] = pd.to_datetime(df_soc["timestamp"])
+    df_soc_resampled = df_soc.set_index("timestamp").resample("15T").mean().reset_index()
+    print("SOC data headers:", df_soc_resampled.columns.tolist())
+    print(df_soc_resampled.head(4))  # Print first 4 rows
+    return df_soc_resampled, df_grid_resampled
+
+
+def get_future_data(start_date, end_date):
+    df_solar = get_solar_data(start_date, end_date)
+    df_rates = get_rates_data(start_date, end_date)
+    return df_solar, df_rates
+
 def get_solar_data(start_date, end_date):
     print("Loading Solar data from database...")
     conn = sqlite3.connect(DATABASE_FILENAME)
@@ -28,31 +53,6 @@ def get_solar_data(start_date, end_date):
 
     print("Solar data headers:", df_solar_resampled.columns.tolist())
     print(df_solar_resampled.head(4))  # Print first 4 rows
-    return df_solar_resampled
-def get_grid_data():
-    print("Loading Grid data from database...")
-    conn = sqlite3.connect(DATABASE_FILENAME)
-    df_grid = pd.read_sql_query("SELECT timestamp, grid_data FROM grid_data", conn)
-    df_grid["timestamp"] = pd.to_datetime(df_grid["timestamp"])
-    df_grid_resampled = df_grid.set_index("timestamp").resample("15T").mean().reset_index()
-    print("Grid data headers:", df_grid_resampled.columns.tolist())
-    print(df_grid_resampled.head(4))
-    return df_grid_resampled
-
-def get_solar_data(start_date, end_date):
-    print("Loading Solar data from database...")
-    conn = sqlite3.connect(DATABASE_FILENAME)
-    df_solar = pd.read_sql_query("SELECT * FROM solar", conn)
-    df_solar["datetime"] = pd.to_datetime(df_solar["datetime"])
-    
-    # Filter the data for the specified date range
-    df_solar = df_solar[(df_solar['datetime'] >= start_date) & (df_solar['datetime'] <= end_date)]
-    
-    df_solar_resampled = df_solar.set_index("datetime").resample("15T").mean().reset_index()
-    df_solar_resampled['pv_estimate'] = df_solar_resampled['pv_estimate'].fillna(0).div(2)
-    df_solar_resampled = df_solar_resampled.rename(columns={"datetime": "timestamp"})
-    print("Solar data headers:", df_solar_resampled.columns.tolist())
-    print(df_solar_resampled.head(4))
     return df_solar_resampled
 
 def get_rates_data(start_date, end_date):
@@ -98,24 +98,22 @@ def train_model(df):
     return model
 
 
-def predict_soc_for_day(start_date, end_date, model, df_soc, df_grid):
-    print("Predicting SOC for the day...")
-    start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
-    end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
-
-    # Fetch solar and rates data for the specified date range
-    df_solar = get_solar_data(start_date, end_date)
-    df_rates = get_rates_data(start_date, end_date)
-
-    # Merge all data
+def predict_soc_for_day(start_date, end_date, model, df_soc, df_grid, df_solar, df_rates):
+    # Merge past data (SOC and Grid) with future data (Solar and Rates)
     df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
     df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
     df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
-    print("Headers after final merge with Rates data:", df_merged.head(4))
 
+    # Add necessary time columns for the model
+    df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
+    df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
+    df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday()
+
+    # Predict SOC
     predictions = {}
-    current_time = start_timestamp
+    current_time = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+    end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
     while current_time < end_timestamp:
         matching_rows = df_merged[df_merged["timestamp"] == current_time]
         if not matching_rows.empty:
@@ -131,7 +129,6 @@ def predict_soc_for_day(start_date, end_date, model, df_soc, df_grid):
             predicted_soc = model.predict(pd.DataFrame([features]))[0]
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = max(0, min(predicted_soc, 100))
         else:
-            print(f"No data for timestamp: {current_time}")
             predictions[current_time.strftime("%Y-%m-%d %H:%M:%S")] = None
         current_time += timedelta(minutes=15)
 
@@ -160,28 +157,16 @@ def on_message(client, userdata, msg):
     start_date = request_data.get("start_date")
     end_date = request_data.get("end_date")
     if start_date and end_date:
-        # Fetch data
-        df_soc = get_soc_data()
-        df_grid = get_grid_data()
-        df_solar = get_solar_data(start_date, end_date)
-        df_rates = get_rates_data(start_date, end_date)
+        # Fetch past and future data
+        df_soc, df_grid = get_past_data()
+        df_solar, df_rates = get_future_data(start_date, end_date)
 
-        # Merge the dataframes
-        df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
-        df_merged = pd.merge(df_merged, df_solar, on="timestamp", how="outer")
-        df_merged = pd.merge(df_merged, df_rates, on="timestamp", how="outer")
-        df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
+        # Train the model using past data
+        df_past = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
+        model = train_model(df_past)
 
-        # Add necessary time columns
-        df_merged['minute_of_day'] = df_merged['timestamp'].dt.minute + df_merged['timestamp'].dt.hour * 60
-        df_merged['hour_of_day'] = df_merged['timestamp'].dt.hour
-        df_merged['day_of_week'] = df_merged['timestamp'].dt.weekday()
-
-        # Train the model
-        model = train_model(df_merged)
-
-        # Predict SOC
-        predictions = predict_soc_for_day(start_date, end_date, model, df_merged)
+        # Predict SOC using a combination of past and future data
+        predictions = predict_soc_for_day(start_date, end_date, model, df_soc, df_grid, df_solar, df_rates)
         client.publish("battery_soc/response", json.dumps({"predictions": predictions}))
 
 def on_disconnect(client, userdata, rc):
