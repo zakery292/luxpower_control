@@ -33,8 +33,8 @@ def get_past_data():
 
 def get_future_data(start_date, end_date):
     df_solar = get_solar_data(start_date, end_date)
-    df_rates = get_rates_data(start_date, end_date)
-    return df_solar, df_rates
+
+    return df_solar
 
 def get_solar_data(start_date, end_date):
     print("Loading Solar data from database...")
@@ -84,11 +84,11 @@ def get_rates_data(start_date, end_date):
 
 def train_model(df):
     print("Starting model training...")
-    features = ["minute_of_day", "hour_of_day", "day_of_week", "Cost", "grid_data", "pv_estimate"]
+    features = ["minute_of_day", "hour_of_day", "day_of_week", "grid_data", "pv_estimate"]
     X = df[features]
     y = df["soc"]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=50)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=50)
     model = HistGradientBoostingRegressor(random_state=43, max_iter=1000, max_leaf_nodes=1000)
     model.fit(X_train, y_train)
 
@@ -111,7 +111,6 @@ def predict_soc_for_day(start_date, end_date, model, df_merged):
                 "minute_of_day": current_time.minute + current_time.hour * 60,
                 "hour_of_day": current_time.hour,
                 "day_of_week": current_time.weekday(),
-                "Cost": row.get("Cost", 0),
                 "grid_data": row.get("grid_data", 0),
                 "pv_estimate": row.get("pv_estimate", 0)
             }
@@ -148,7 +147,7 @@ def on_message(client, userdata, msg):
     if start_date and end_date:
         # Fetch past and future data
         df_soc, df_grid = get_past_data()
-        df_solar, df_rates = get_future_data(start_date, end_date)
+        df_solar = get_future_data(start_date, end_date)
 
         # Merge the dataframes
         df_merged = pd.merge(df_soc, df_grid, on="timestamp", how="outer")
