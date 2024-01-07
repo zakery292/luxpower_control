@@ -117,33 +117,26 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
     print("predict_soc_for_day called with start_date:", start_date, "end_date:", end_date)
     df = get_soc_data2()
 
-    # Merge the rates data
-    df = pd.merge(df, df_rates_expanded, on="timestamp", how="outer")
-    df.ffill(inplace=True)  # Forward fill to handle NaNs
-
-    # Add the 'Cost' feature only if it's missing
-    if 'Cost' not in df.columns:
-        df['Cost'] = 0
-
+    # Merge rates and solar data
     df_solar_resampled = get_solar_data()
-    df_merged = pd.merge(df, df_solar_resampled, on="timestamp", how="outer")
-    df_merged.ffill(inplace=True)  # Forward fill to handle NaN
+    df_merged = pd.merge(df, df_rates_expanded, on="timestamp", how="outer")
+    df_merged = pd.merge(df_merged, df_solar_resampled, on="timestamp", how="outer")
+    df_merged.ffill(inplace=True)  # Forward fill to handle NaNs
 
     model = train_model(df_merged)
 
-    # Convert start and end dates to datetime objects
+    # Define thresholds and parameters
+    min_charge_soc = 20  # Minimum SOC to start charging
+    max_discharge_soc = 80  # Maximum SOC to start discharging
+    charge_cost_threshold = 20  # Cost threshold for grid charging
+
     start_timestamp = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     end_timestamp = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
-    total_charge_cost_pence = 0.0
-    print(f"Start timestamp: {start_timestamp}, End timestamp: {end_timestamp}")
 
     predictions = {}
     actions = {}
-    prev_soc = None  # Variable to store the previous SOC value
+    prev_soc = None
 
-    min_charge_soc = 20  # Minimum SOC to start charging
-    max_discharge_soc = 80  # Maximum SOC to start discharging
-    charge_cost_threshold = 20
     current_time = start_timestamp
     while current_time < end_timestamp:
         print(f"Processing for timestamp: {current_time}")
@@ -165,7 +158,7 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
                 "grid_data": row["grid_data"],
             }
 
-            # Predict the SOC
+            # Predict SOC
             predicted_soc = model.predict(pd.DataFrame([features]))[0]
             predicted_soc = max(10, min(predicted_soc, 100))  # Ensuring SOC is within bounds
 
@@ -173,7 +166,7 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
             solar_generation = row.get("pv_estimate", 0) / 2  # Treat missing data as 0
             net_grid_usage = row["grid_data"] - solar_generation * 1000  # Convert kWh to W
 
-            # Enhanced decision logic
+            # Enhanced decision logic with solar consideration
             if solar_generation > 0:
                 if predicted_soc < max_discharge_soc:
                     action = 'Charge with Solar'  # Charging with solar
@@ -197,10 +190,8 @@ def predict_soc_for_day(start_date, end_date, df_rates_expanded):
 
         current_time += timedelta(minutes=15)
 
-    total_charge_cost_pounds = total_charge_cost_pence / 100
-    print(f"Total estimated charge cost for the period: £{total_charge_cost_pounds:.2f}")
-
     return predictions, actions
+
 
 
 
