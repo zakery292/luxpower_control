@@ -11,22 +11,26 @@ def get_db_path():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    db_path = get_db_path()
+    db_path = get_db_path()  # Make sure you have defined this function
     conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    conn.row_factory = sqlite3.Row  # Make rows accessible like dictionaries
-    cursor = conn.cursor()
-    
-    if request.method == 'POST':
-        selected_table = request.form['table_select']
-    else:
-        selected_table = tables[0][0] if tables else None
+    # Fetch table names for the dropdown
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cursor.fetchall()
 
-    if selected_table:
+    # Ensure 'tables' is not empty before accessing it
+    if tables:
+        if request.method == 'POST':
+            selected_table = request.form['table_select']
+        else:
+            selected_table = tables[0]['name']  # Accessing the first table's name
+
         cursor.execute(f"SELECT * FROM {selected_table}")
         data = [dict(row) for row in cursor.fetchall()]
     else:
+        selected_table = None
         data = []
 
     cursor.close()
