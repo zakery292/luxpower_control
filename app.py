@@ -15,13 +15,19 @@ def index():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Get table names for dropdown
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
+    conn.row_factory = sqlite3.Row  # Make rows accessible like dictionaries
+    cursor = conn.cursor()
+    
+    if request.method == 'POST':
+        selected_table = request.form['table_select']
+    else:
+        selected_table = tables[0][0] if tables else None
 
-    selected_table = request.form.get('table_select') if request.method == 'POST' else tables[0][0]
-    cursor.execute(f"SELECT * FROM {selected_table}")
-    data = cursor.fetchall()
+    if selected_table:
+        cursor.execute(f"SELECT * FROM {selected_table}")
+        data = [dict(row) for row in cursor.fetchall()]
+    else:
+        data = []
 
     cursor.close()
     conn.close()
