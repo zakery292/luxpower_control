@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Database Viewer</title>
+</head>
+<body>
+    <form action="/" method="post">
+        <select name="table_select" onchange="this.form.submit()">
+            {% for table in tables %}
+            <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
+                {{ table[0] }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <!-- Table to Display Data -->
+    <table border="1">
+        {% if data %}
+            <!-- Table Header -->
+            <tr>
+                {% for column in data[0].keys() %}
+                    <th>{{ column }}</th>
+                {% endfor %}
+            </tr>
+
+            <!-- Table Data Rows -->
+            {% for row in data %}
+                <tr>
+                    {% for cell in row.values() %}
+                        <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="100%">No data found</td>
+            </tr>
+        {% endif %}
+    </table>
+</body>
+</html>

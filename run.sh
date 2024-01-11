@@ -22,6 +22,9 @@ run_with_restart "/opt/predict_soc.py" > >(tee -a /proc/1/fd/1) 2> >(tee -a /pro
 run_with_restart "/opt/db_cleanup.py" > >(tee -a /proc/1/fd/1) 2> >(tee -a /proc/1/fd/2) &
 run_with_restart "/opt/solar_collections.py" > >(tee -a /proc/1/fd/1) 2> >(tee -a /proc/1/fd/2) &
 
+echo "Starting Flask app..."
+python /opt/app.py &
+
 echo "LuxPower Control & DB Add-on started successfully."
 # Wait for the processes to complete
 wait
