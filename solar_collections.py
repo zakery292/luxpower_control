@@ -17,7 +17,7 @@ def on_message(client, userdata, msg):
     solar_data_list = json.loads(msg.payload.decode('utf-8'))
     print(f"SOLAR COLLECTIONS  Received solar data")
 
-    conn = sqlite3.connect(DATABASE_FILENAME)
+    conn = sqlite3.connect(DATABASE_FILENAME, timeout=20)
     cursor = conn.cursor()
 
     try:
