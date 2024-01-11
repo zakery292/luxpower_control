@@ -5,9 +5,9 @@ import json
 app = Flask(__name__)
 
 def get_db_path():
-    with open('/data/config.yaml') as f:  # Path to Home Assistant add-on options
+    with open('/data/options.json') as f:  # Path to Home Assistant add-on options
         options = json.load(f)
-    return options.get('db_path', 'default_db_path.db')  # Default if not set
+    return options.get('db_path', '/config/soc_database.db')  # Default if not set
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
