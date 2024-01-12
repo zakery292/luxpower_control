@@ -12,8 +12,9 @@
     <div class="main-container">
         <aside class="sidebar">
             <div class="table-links">
+                <h3>Tables</h3>
                 {% for table in tables %}
-                    <a href="{{ url_for('index', selected_table=table[0]) }}">{{ table[0] }}</a>
+                    <a href="./">{{ table[0] }}</a>
                 {% endfor %}
             </div>
             <div class="table-info">
@@ -21,17 +22,6 @@
                 <p>Last Updated: {{ last_updated }}</p> <!-- This will need backend support -->
             </div>
         </aside>
-        <div class="content">
-            <form action="./ method="post">
-                <select name="table_select" onchange="this.form.submit()">
-                    {% for table in tables %}
-                        <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
-                            {{ table[0] }}
-                        </option>
-                    {% endfor %}
-                </select>
-                <button type="submit">Submit</button>
-            </form>
             <div class="table-container">
                 <!-- First table -->
                 <table>
