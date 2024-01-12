@@ -23,7 +23,9 @@ def index():
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-
+    per_page = 30
+    page = request.args.get('page', 1, type=int)
+    offset = (page - 1) * per_page
     # Get list of tables
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = cursor.fetchall()
