@@ -10,7 +10,7 @@
         <h1>{{ selected_table if selected_table else 'Database Viewer' }}</h1>
     </header>
     <div class="container">
-        <form action="/" method="post">
+        <form action="{{ url_for('index') }}" method="post">
             <select name="table_select" onchange="this.form.submit()">
                 {% for table in tables %}
                 <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
@@ -45,6 +45,7 @@
             {% endif %}
         </table>
 <!-- Pagination -->
+<!-- Pagination -->
 <div class="pagination">
     {% if total_pages > 1 %}
         {% if page > 1 %}
@@ -52,54 +53,52 @@
             <a href="javascript:void(0)" onclick="goToPage({{ page - 1 }})" class="page-link">Prev</a>
         {% endif %}
 
-        {% set prev_pages = range([page - 2, 1] | max, page) %}
-        {% set next_pages = range(page + 1, [page + 2, total_pages] | min + 1) %}
-        {% set outer_pages = [1, 2, total_pages - 1, total_pages] %}
-
         <!-- Render start pages -->
-        {% for i in outer_pages %}
-            {% if i <= 2 %}
+        {% for i in range(1, 3) %}
+            {% if i <= total_pages %}
                 <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
             {% endif %}
         {% endfor %}
 
-        <!-- Add ellipsis for gap between outer and middle pages -->
-        {% if page > 3 %}
+        <!-- Show ellipsis if there is a gap between the start and current pages -->
+        {% if page > 5 %}
             <span>...</span>
-        {% endif %}
+        {% endif}
+        <!-- Show page numbers around the current page -->
+    {% for i in range([page - 2, 1]|max, [page + 3, total_pages]|min) %}
+    {% if i not in range(1, 3) and i not in range(total_pages - 1, total_pages + 1) %}
+        <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
+    {% endif %}
+    {% endfor %}
 
-        <!-- Render previous pages -->
-        {% for i in prev_pages %}
-            <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link">{{ i }}</a>
-        {% endfor %}
-
-        <!-- Render current page -->
-        <a href="javascript:void(0)" class="page-link active">{{ page }}</a>
-
-        <!-- Render next pages -->
-        {% for i in next_pages %}
-            <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link">{{ i }}</a>
-        {% endfor %}
-
-        <!-- Add ellipsis for gap between middle and endpages -->
-        {% if page < total_pages - 2 %}
+    <!-- Show ellipsis if there is a gap between the current and end pages -->
+    {% if page < total_pages - 4 %}
         <span>...</span>
-        {% endif %}
-            <!-- Render end pages -->
-        {% for i in outer_pages %}
-        {% if i >= total_pages - 1 %}
+    {% endif %}
+
+    <!-- Render end pages -->
+    {% for i in range(total_pages - 1, total_pages + 1) %}
+        {% if i >= 3 %}
             <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
         {% endif %}
-        % endfor %}
+    {% endfor %}
 
-        {% if page < total_pages %}
-            <a href="javascript:void(0)" onclick="goToPage({{ page + 1 }})" class="page-link">Next</a>
-            <a href="javascript:void(0)" onclick="goToPage({{ total_pages }})" class="page-link">Last</a>
-        {% endif %}
-        {% endif %}
-        </div>
+    {% if page < total_pages %}
+        <a href="javascript:void(0)" onclick="goToPage({{ page + 1 }})" class="page-link">Next</a>
+        <a href="javascript:void(0)" onclick="goToPage({{ total_pages }})" class="page-link">Last</a>
+    {% endif %}
+    {% endif %}
+    </div>  
 
 
     </div>
+    <script>
+        function goToPage(pageNum) {
+            const queryString = window.location.search;
+            const urlParams = new URLSearchParams(queryString);
+            urlParams.set('page', pageNum);
+            window.location.search = urlParams.toString();
+        }
+    </script>
 </body>
 </html>

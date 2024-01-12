@@ -20,7 +20,8 @@ def index():
     tables = cursor.fetchall()
 
     selected_table = request.form.get('table_select') if request.method == 'POST' else (tables[0]['name'] if tables else None)
-
+    if request.method == 'POST':
+        print("Handling POST request")
     # Pagination
     page = request.args.get('page', 1, type=int)
     per_page = 30
