@@ -10,7 +10,7 @@
         <h1>{{ selected_table if selected_table else 'Database Viewer' }}</h1>
     </header>
     <div class="container">
-        <form action="{{ url_for('index') }}" method="post">
+        <form action="./" method="post">
             <select name="table_select">
                 {% for table in tables %}
                 <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
