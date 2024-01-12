@@ -4,11 +4,11 @@ import json
 import sys
 import logging
 
-app.logger.addHandler(logging.StreamHandler(sys.stdout))
-app.logger.setLevel(logging.DEBUG)
+
 
 app = Flask(__name__)
-
+app.logger.addHandler(logging.StreamHandler(sys.stdout))
+app.logger.setLevel(logging.DEBUG)
 def get_db_path():
     with open('/data/options.json') as f:  # Path to Home Assistant add-on options
         options = json.load(f)
