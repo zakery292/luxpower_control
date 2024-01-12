@@ -1,41 +1,54 @@
 body {
     font-family: Arial, sans-serif;
     background-color: #f4f4f4;
+    color: #333; /* Default text color */
     margin: 0;
     padding: 0;
+    transition: background-color 0.3s, color 0.3s; /* Smooth transition for color changes */
 }
+
 header {
     background-color: #333;
     color: white;
     text-align: center;
     padding: 10px 0;
 }
+
 .container {
     width: 95%;
     margin: 20px auto;
 }
+
 select {
     padding: 5px 10px;
     margin-bottom: 20px;
 }
+
 table {
     width: 100%;
     border-collapse: collapse;
 }
+
 th, td {
     border: 1px solid #ddd;
     padding: 8px;
     text-align: left;
 }
+
 th {
     background-color: #4CAF50;
     color: white;
 }
-tr:nth-child(even) {background-color: #f2f2f2;}
+
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
 .pagination {
     margin-top: 20px;
     text-align: center;
 }
+
 .page-link {
     display: inline-block;
     margin-right: 5px;
@@ -44,6 +57,38 @@ tr:nth-child(even) {background-color: #f2f2f2;}
     color: white;
     text-decoration: none;
 }
+
 .page-link.active {
     background-color: #4CAF50;
+}
+
+/* Dark Mode Styles */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #121212; /* Dark background */
+        color: #fff; /* Light text */
+    }
+
+    header {
+        background-color: #1c1c1c; /* Slightly lighter header for contrast */
+    }
+
+    th, td {
+        border: 1px solid #333; /* Darker border for tables */
+    }
+
+    th {
+        background-color: #1e7e34; /* Dark green header */
+    }
+
+    tr:nth-child(even) {
+        background-color: #1c1c1c; /* Darker background
+.page-link {
+    background-color: #1c1c1c; /* Darker background for pagination links */
+    color: #fff; /* Light text for pagination links */
+}
+
+.page-link.active {
+    background-color: #28a745; /* Slightly lighter green for active page link */
+}
 }
