@@ -1,43 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Database Viewer</title>
-</head>
+    <head>
+        <meta charset="UTF-8">
+        <title>{{ selected_table if selected_table else 'Database Viewer' }}</title>
+        <link rel="stylesheet" href="static/styles.css">
+    </head>
 <body>
-    <form action="/" method="post">
-        <select name="table_select" onchange="this.form.submit()">
-            {% for table in tables %}
-            <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
-                {{ table[0] }}
-            </option>
-            {% endfor %}
-        </select>
-    </form>
-
-    <!-- Table to Display Data -->
-    <table border="1">
-        {% if data %}
-            <!-- Table Header -->
-            <tr>
-                {% for column in data[0].keys() %}
-                    <th>{{ column }}</th>
+    <header>
+        <h1>{{ selected_table if selected_table else 'Database Viewer' }}</h1>
+    </header>
+    <div class="container">
+        <form action="/" method="post">
+            <select name="table_select" onchange="this.form.submit()">
+                {% for table in tables %}
+                <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
+                    {{ table[0] }}
+                </option>
                 {% endfor %}
-            </tr>
+            </select>
+        </form>
 
-            <!-- Table Data Rows -->
-            {% for row in data %}
+        <!-- Table to Display Data -->
+        <table>
+            {% if data %}
+                <!-- Table Header -->
                 <tr>
-                    {% for cell in row.values() %}
-                        <td>{{ cell }}</td>
+                    {% for column in data[0].keys() %}
+                        <th>{{ column }}</th>
                     {% endfor %}
                 </tr>
+
+                <!-- Table Data Rows -->
+                {% for row in data %}
+                    <tr>
+                        {% for cell in row.values() %}
+                            <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="100%">No data found</td>
+                </tr>
+            {% endif %}
+        </table>
+        <div class="pagination">
+            {% if page > 1 %}
+                <a href="/?page={{ page - 1 }}" class="page-link">Prev</a>
+            {% endif %}
+            {% for p in range(1, total_pages + 1) %}
+                <a href="/?page={{ p }}" class="page-link {% if p == page %}active{% endif %}">{{ p }}</a>
             {% endfor %}
-        {% else %}
-            <tr>
-                <td colspan="100%">No data found</td>
-            </tr>
-        {% endif %}
-    </table>
+            {% if page < total_pages %}
+                <a href="/?page={{ page + 1 }}" class="page-link">Next</a>
+            {% endif %}
+        </div>
+    </div>
 </body>
 </html>

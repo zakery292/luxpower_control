@@ -11,32 +11,36 @@ def get_db_path():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    db_path = get_db_path()  # Make sure you have defined this function
+    db_path = get_db_path()  # Make sure this function is defined to get the DB path
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Fetch table names for the dropdown
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = cursor.fetchall()
 
-    # Ensure 'tables' is not empty before accessing it
-    if tables:
-        if request.method == 'POST':
-            selected_table = request.form['table_select']
-        else:
-            selected_table = tables[0]['name']  # Accessing the first table's name
+    selected_table = request.form.get('table_select') if request.method == 'POST' else (tables[0]['name'] if tables else None)
 
-        cursor.execute(f"SELECT * FROM {selected_table}")
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    per_page = 30
+    offset = (page - 1) * per_page
+
+    if selected_table:
+        cursor.execute(f"SELECT COUNT(*) FROM {selected_table}")
+        total_rows = cursor.fetchone()[0]
+        total_pages = (total_rows + per_page - 1) // per_page
+
+        cursor.execute(f"SELECT * FROM {selected_table} LIMIT {per_page} OFFSET {offset}")
         data = [dict(row) for row in cursor.fetchall()]
     else:
-        selected_table = None
+        total_pages = 0
         data = []
 
     cursor.close()
     conn.close()
 
-    return render_template('index.html', tables=tables, data=data, selected_table=selected_table)
+    return render_template('index.html', tables=tables, data=data, selected_table=selected_table, page=page, total_pages=total_pages)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80)
