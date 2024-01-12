@@ -1,97 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>{{ selected_table if selected_table else 'Database Viewer' }}</title>
-        <link rel="stylesheet" href="./static/styles.css">
-    </head>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ selected_table if selected_table else 'Database Viewer' }}</title>
+    <link rel="stylesheet" href="./static/styles.css">
+</head>
 <body>
     <header>
         <h1>{{ selected_table if selected_table else 'Database Viewer' }}</h1>
     </header>
-    <div class="container">
-        <form action="./" method="post">
-            <select name="table_select">
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="table-links">
                 {% for table in tables %}
-                <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
-                    {{ table[0] }}
-                </option>
+                    <a href="{{ url_for('index', selected_table=table[0]) }}">{{ table[0] }}</a>
                 {% endfor %}
-            </select>
-            <button type="submit">Submit</button>
-        </form>
-
-        <!-- Table to Display Data -->
-        <table>
-            {% if data %}
-                <!-- Table Header -->
-                <tr>
-                    {% for column in data[0].keys() %}
-                        <th>{{ column }}</th>
+            </div>
+            <div class="table-info">
+                <p>Rows: {{ total_rows }}</p>
+                <p>Last Updated: {{ last_updated }}</p> <!-- This will need backend support -->
+            </div>
+        </aside>
+        <div class="content">
+            <form action="./ method="post">
+                <select name="table_select" onchange="this.form.submit()">
+                    {% for table in tables %}
+                        <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
+                            {{ table[0] }}
+                        </option>
                     {% endfor %}
-                </tr>
-
-                <!-- Table Data Rows -->
-                {% for row in data %}
+                </select>
+                <button type="submit">Submit</button>
+            </form>
+            <div class="table-container">
+                <!-- First table -->
+                <table>
+                    {% if data %}
+                        <!-- Table Header -->
+                        <tr>
+                            {% for column in data[0].keys() %}
+                                <th>{{ column }}</th>
+                            {% endfor %}
+                        </tr>
+                        <!-- Table Data Rows -->
+                        {% for row in data[:30] %}
+                            <tr>
+                                {% for cell in row.values() %}
+                                    <td>{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                </table>
+                <!-- Second table (if more than 30 rows) -->
+                {% if data|length > 30 %}
+                <table>
+                    <!-- Table Header -->
                     <tr>
-                        {% for cell in row.values() %}
-                            <td>{{ cell }}</td>
+                        {% for column in data[0].keys() %}
+                            <th>{{ column }}</th>
                         {% endfor %}
                     </tr>
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="100%">No data found</td>
-                </tr>
-            {% endif %}
-        </table>
-<!-- Pagination -->
-<!-- Pagination -->
-<div class="pagination">
-    {% if total_pages > 1 %}
-        {% if page > 1 %}
-            <a href="javascript:void(0)" onclick="goToPage(1)" class="page-link">First</a>
-            <a href="javascript:void(0)" onclick="goToPage({{ page - 1 }})" class="page-link">Prev</a>
-        {% endif %}
-
-        <!-- Render start pages -->
-        {% for i in range(1, 3) %}
-            {% if i <= total_pages %}
-                <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
-            {% endif %}
-        {% endfor %}
-
-        <!-- Show ellipsis if there is a gap between the start and current pages -->
-        {% if page > 5 %}
-            <span>...</span>
-        {% endif %}
-        <!-- Show page numbers around the current page -->
-    {% for i in range([page - 2, 1]|max, [page + 3, total_pages]|min) %}
-    {% if i not in range(1, 3) and i not in range(total_pages - 1, total_pages + 1) %}
-        <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
-    {% endif %}
-    {% endfor %}
-
-    <!-- Show ellipsis if there is a gap between the current and end pages -->
-    {% if page < total_pages - 4 %}
-        <span>...</span>
-    {% endif %}
-
-    <!-- Render end pages -->
-    {% for i in range(total_pages - 1, total_pages + 1) %}
-        {% if i >= 3 %}
-            <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
-        {% endif %}
-    {% endfor %}
-
-    {% if page < total_pages %}
-        <a href="javascript:void(0)" onclick="goToPage({{ page + 1 }})" class="page-link">Next</a>
-        <a href="javascript:void(0)" onclick="goToPage({{ total_pages }})" class="page-link">Last</a>
-    {% endif %}
-    {% endif %}
-    </div>  
-
-
+                    <!-- Table Data Rows -->
+                    {% for row in data[30:60] %}
+                        <tr>
+                            {% for cell in row.values() %}
+                                <td>{{ cell }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </table>
+                {% endif %}
+            </div>
+            <!-- Pagination here -->
+        </div>
     </div>
     <script>
         function goToPage(pageNum) {

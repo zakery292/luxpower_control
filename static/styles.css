@@ -1,10 +1,10 @@
 body {
     font-family: Arial, sans-serif;
     background-color: #f4f4f4;
-    color: #333; /* Default text color */
+    color: #333;
     margin: 0;
     padding: 0;
-    transition: background-color 0.3s, color 0.3s; /* Smooth transition for color changes */
+    transition: background-color 0.3s, color 0.3s;
 }
 
 header {
@@ -14,81 +14,116 @@ header {
     padding: 10px 0;
 }
 
-.container {
+.main-container {
+    display: flex;
     width: 95%;
     margin: 20px auto;
 }
 
-select {
-    padding: 5px 10px;
-    margin-bottom: 20px;
+.sidebar {
+    flex: 0 0
+200px; /* fixed width for the sidebar */
+margin-right: 20px;
+}
+
+.table-links a {
+display: block;
+padding: 5px;
+color: #333;
+text-decoration: none;
+}
+
+.table-links a:hover,
+.table-links a:focus {
+background-color: #ddd;
+}
+
+.table-info {
+padding: 10px;
+background-color: #f9f9f9;
+margin-top: 10px;
+}
+
+.content {
+flex-grow: 1;
+}
+
+.table-container {
+display: grid;
+grid-template-columns: 1fr 1fr; /* Two equal columns /
+gap: 20px;
+overflow-x: auto; / Allows tables to scroll horizontally */
 }
 
 table {
-    width: 100%;
-    border-collapse: collapse;
+width: 100%;
+border-collapse: collapse;
 }
 
 th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
+border: 1px solid #ddd;
+padding: 8px;
+text-align: left;
 }
 
 th {
-    background-color: #4CAF50;
-    color: white;
+background-color: #4CAF50;
+color: white;
 }
 
 tr:nth-child(even) {
-    background-color: #f2f2f2;
+background-color: #f2f2f2;
 }
 
 .pagination {
-    margin-top: 20px;
-    text-align: center;
+margin-top: 20px;
+text-align: center;
 }
 
 .page-link {
-    display: inline-block;
-    margin-right: 5px;
-    padding: 5px 10px;
-    background-color: #333;
-    color: white;
-    text-decoration: none;
+display: inline-block;
+margin-right: 5px;
+padding: 5px 10px;
+background-color: #333;
+color: white;
+text-decoration: none;
 }
 
 .page-link.active {
-    background-color: #4CAF50;
+background-color: #4CAF50;
 }
 
 /* Dark Mode Styles */
 @media (prefers-color-scheme: dark) {
-    body {
-        background-color: #121212; /* Dark background */
-        color: #fff; /* Light text */
-    }
+body {
+background-color: #121212;
+color: #fff;
+}
 
-    header {
-        background-color: #1c1c1c; /* Slightly lighter header for contrast */
-    }
+css
+Copy code
+header {
+    background-color: #1c1c1c;
+}
 
-    th, td {
-        border: 1px solid #333; /* Darker border for tables */
-    }
+th, td {
+    border: 1px solid #333;
+}
 
-    th {
-        background-color: #1e7e34; /* Dark green header */
-    }
+th {
+    background-color: #1e7e34;
+}
 
-    tr:nth-child(even) {
-        background-color: #1c1c1c; /* Darker background
+tr:nth-child(even) {
+    background-color: #1c1c1c;
+}
+
 .page-link {
-    background-color: #1c1c1c; /* Darker background for pagination links */
-    color: #fff; /* Light text for pagination links */
+    background-color: #1c1c1c;
+    color: #fff;
 }
 
 .page-link.active {
-    background-color: #28a745; /* Slightly lighter green for active page link */
+    background-color: #28a745;
 }
 }
