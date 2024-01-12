@@ -14,7 +14,7 @@
             <div class="table-links">
                 <h3>Tables</h3>
                 {% for table in tables %}
-                    <a href="./">{{ table[0] }}</a>
+                    <a href="{{ url_for('index', selected_table=table[0]) }}">{{ table[0] }}</a>
                 {% endfor %}
             </div>
             <div class="table-info">
@@ -63,7 +63,52 @@
                 {% endif %}
             </div>
             <!-- Pagination here -->
-        </div>
+<!-- Pagination -->
+<div class="pagination">
+    {% if total_pages > 1 %}
+        {% if page > 1 %}
+            <a href="javascript:void(0)" onclick="goToPage(1)" class="page-link">First</a>
+            <a href="javascript:void(0)" onclick="goToPage({{ page - 1 }})" class="page-link">Prev</a>
+        {% endif %}
+
+        <!-- Render start pages -->
+        {% for i in range(1, 3) %}
+            {% if i <= total_pages %}
+                <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Show ellipsis if there is a gap between the start and current pages -->
+        {% if page > 5 %}
+            <span>...</span>
+        {% endif %}
+        <!-- Show page numbers around the current page -->
+    {% for i in range([page - 2, 1]|max, [page + 3, total_pages]|min) %}
+    {% if i not in range(1, 3) and i not in range(total_pages - 1, total_pages + 1) %}
+        <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Show ellipsis if there is a gap between the current and end pages -->
+    {% if page < total_pages - 4 %}
+        <span>...</span>
+    {% endif %}
+
+    <!-- Render end pages -->
+    {% for i in range(total_pages - 1, total_pages + 1) %}
+        {% if i >= 3 %}
+            <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+        <a href="javascript:void(0)" onclick="goToPage({{ page + 1 }})" class="page-link">Next</a>
+        <a href="javascript:void(0)" onclick="goToPage({{ total_pages }})" class="page-link">Last</a>
+    {% endif %}
+    {% endif %}
+    </div>  
+
+
     </div>
     <script>
         function goToPage(pageNum) {
