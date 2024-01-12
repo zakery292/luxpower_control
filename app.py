@@ -1,6 +1,11 @@
 from flask import Flask, render_template, request
 import sqlite3
 import json
+import sys
+import logging
+
+app.logger.addHandler(logging.StreamHandler(sys.stdout))
+app.logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 
