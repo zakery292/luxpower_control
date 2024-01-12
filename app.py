@@ -20,14 +20,19 @@ def index():
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    app.logger.debug(f"Request method: {request.method}")
     if request.method == 'POST':
-        app.logger.debug("Handling POST request")
+        app.logger.debug(f"Handling POST request: {request.form}")
+        selected_table = request.form.get('table_select')
+        app.logger.debug(f"Selected table: {selected_table}")
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = cursor.fetchall()
 
     selected_table = request.form.get('table_select') if request.method == 'POST' else (tables[0]['name'] if tables else None)
+    if request.method == 'POST':
+        app.logger.debug(f"Handling POST request: {request.form}")
+        selected_table = request.form.get('table_select')
+        app.logger.debug(f"Selected table: {selected_table}")
     # Pagination
     page = request.args.get('page', 1, type=int)
     per_page = 30
