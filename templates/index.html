@@ -11,13 +11,14 @@
     </header>
     <div class="container">
         <form action="{{ url_for('index') }}" method="post">
-            <select name="table_select" onchange="this.form.submit()">
+            <select name="table_select">
                 {% for table in tables %}
                 <option value="{{ table[0] }}" {% if selected_table == table[0] %} selected {% endif %}>
                     {{ table[0] }}
                 </option>
                 {% endfor %}
             </select>
+            <button type="submit">Submit</button>
         </form>
 
         <!-- Table to Display Data -->
