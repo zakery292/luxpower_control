@@ -48,11 +48,11 @@ margin-top: 10px;
 flex-grow: 1;
 }
 
-.table-container {
-display: grid;
-grid-template-columns: 1fr 1fr; /* Two equal columns /
-gap: 20px;
-overflow-x: auto; / Allows tables to scroll horizontally */
+.table-container table {
+    width: auto;  /* Allows table to only be as wide as its content */
+    min-width: 50%;  /* Ensures tables take up at least half the container width */
+    border-collapse: collapse;
+    margin-bottom: 20px; /* Space between tables if they wrap */
 }
 
 table {

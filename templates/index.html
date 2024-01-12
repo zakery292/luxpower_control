@@ -20,9 +20,14 @@
                         <button type="submit" class="table-button">{{ table[0] }}</button>
                     </form>
                 {% endfor %}
+                <div class="table-info">
+                    <p>Rows: {{ total_rows }}</p>
+                    <p>Last Updated: {{ last_updated }}</p> <!-- This will need backend support -->
+                </div>
+            </aside>
             </div>
             <div class="table-container">
-                {% set rows_per_table = 30 %}
+                {% set rows_per_table = 20 %}
                 {% set current_table = 1 %}
                 {% set current_row = 0 %}
                 <!-- Start first table -->
