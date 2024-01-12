@@ -2,48 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ selected_table if selected_table else 'Database Viewer' }}</title>
-    <link rel="stylesheet" href="./static/styles.css">
+    <title>LuxPower Control DB</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://cdn.materialdesignicons.com/5.4.55/css/materialdesignicons.min.css" rel="stylesheet">
 </head>
 <body>
     <header>
-        <h1>{{ selected_table if selected_table else 'Database Viewer' }}</h1>
+        <h1>LuxPower Control DB</h1>
     </header>
     <div class="main-container">
         <aside class="sidebar">
             <div class="table-links">
                 <h3>Tables</h3>
                 {% for table in tables %}
-                    <a href="{{ url_for('index', selected_table=table[0]) }}">{{ table[0] }}</a>
+                    <form action="./" method="post">
+                        <input type="hidden" name="table_select" value="{{ table[0] }}">
+                        <button type="submit" class="table-button">{{ table[0] }}</button>
+                    </form>
                 {% endfor %}
             </div>
-            <div class="table-info">
-                <p>Rows: {{ total_rows }}</p>
-                <p>Last Updated: {{ last_updated }}</p> <!-- This will need backend support -->
-            </div>
-        </aside>
             <div class="table-container">
-                <!-- First table -->
-                <table>
-                    {% if data %}
-                        <!-- Table Header -->
-                        <tr>
-                            {% for column in data[0].keys() %}
-                                <th>{{ column }}</th>
-                            {% endfor %}
-                        </tr>
-                        <!-- Table Data Rows -->
-                        {% for row in data[:30] %}
-                            <tr>
-                                {% for cell in row.values() %}
-                                    <td>{{ cell }}</td>
-                                {% endfor %}
-                            </tr>
-                        {% endfor %}
-                    {% endif %}
-                </table>
-                <!-- Second table (if more than 30 rows) -->
-                {% if data|length > 30 %}
+                {% set rows_per_table = 30 %}
+                {% set current_table = 1 %}
+                {% set current_row = 0 %}
+                <!-- Start first table -->
                 <table>
                     <!-- Table Header -->
                     <tr>
@@ -52,15 +34,27 @@
                         {% endfor %}
                     </tr>
                     <!-- Table Data Rows -->
-                    {% for row in data[30:60] %}
+                    {% for row in data %}
+                        {% if current_row >= rows_per_table %}
+                            <!-- Close the current table and start a new one -->
+                            </table><table>
+                            <!-- Table Header for new table -->
+                            <tr>
+                                {% for column in data[0].keys() %}
+                                    <th>{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                            {% set current_row = 0 %}
+                            {% set current_table = current_table + 1 %}
+                        {% endif %}
                         <tr>
                             {% for cell in row.values() %}
                                 <td>{{ cell }}</td>
                             {% endfor %}
                         </tr>
+                        {% set current_row = current_row + 1 %}
                     {% endfor %}
                 </table>
-                {% endif %}
             </div>
             <!-- Pagination here -->
 <!-- Pagination -->
