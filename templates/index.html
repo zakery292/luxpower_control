@@ -25,97 +25,47 @@
                     <p>Last Updated: {{ last_updated }}</p> <!-- This will need backend support -->
                 </div>
             </aside>
-            </div>
-            <div class="table-container">
-                {% set rows_per_table = 20 %}
-                {% set current_table = 1 %}
-                {% set current_row = 0 %}
-                <!-- Start first table -->
-                <table>
-                    <!-- Table Header -->
-                    <tr>
-                        {% for column in data[0].keys() %}
-                            <th>{{ column }}</th>
-                        {% endfor %}
-                    </tr>
-                    <!-- Table Data Rows -->
-                    {% for row in data %}
-                        {% if current_row >= rows_per_table %}
-                            <!-- Close the current table and start a new one -->
-                            </table><table>
-                            <!-- Table Header for new table -->
-                            <tr>
-                                {% for column in data[0].keys() %}
-                                    <th>{{ column }}</th>
-                                {% endfor %}
-                            </tr>
-                            {% set current_row = 0 %}
-                            {% set current_table = current_table + 1 %}
-                        {% endif %}
-                        <tr>
-                            {% for cell in row.values() %}
-                                <td>{{ cell }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% set current_row = current_row + 1 %}
-                    {% endfor %}
-                </table>
-            </div>
-            <!-- Pagination here -->
-<!-- Pagination -->
-<div class="pagination">
-    {% if total_pages > 1 %}
-        {% if page > 1 %}
-            <a href="javascript:void(0)" onclick="goToPage(1)" class="page-link">First</a>
-            <a href="javascript:void(0)" onclick="goToPage({{ page - 1 }})" class="page-link">Prev</a>
-        {% endif %}
-
-        <!-- Render start pages -->
-        {% for i in range(1, 3) %}
-            {% if i <= total_pages %}
-                <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
-            {% endif %}
-        {% endfor %}
-
-        <!-- Show ellipsis if there is a gap between the start and current pages -->
-        {% if page > 5 %}
-            <span>...</span>
-        {% endif %}
-        <!-- Show page numbers around the current page -->
-    {% for i in range([page - 2, 1]|max, [page + 3, total_pages]|min) %}
-    {% if i not in range(1, 3) and i not in range(total_pages - 1, total_pages + 1) %}
-        <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
-    {% endif %}
-    {% endfor %}
-
-    <!-- Show ellipsis if there is a gap between the current and end pages -->
-    {% if page < total_pages - 4 %}
-        <span>...</span>
-    {% endif %}
-
-    <!-- Render end pages -->
-    {% for i in range(total_pages - 1, total_pages + 1) %}
-        {% if i >= 3 %}
-            <a href="javascript:void(0)" onclick="goToPage({{ i }})" class="page-link {% if i == page %}active{% endif %}">{{ i }}</a>
-        {% endif %}
-    {% endfor %}
-
-    {% if page < total_pages %}
-        <a href="javascript:void(0)" onclick="goToPage({{ page + 1 }})" class="page-link">Next</a>
-        <a href="javascript:void(0)" onclick="goToPage({{ total_pages }})" class="page-link">Last</a>
-    {% endif %}
-    {% endif %}
-    </div>  
-
-
+        <div class="table-container">
+            <div id="table1" class="dynamic-table"></div>
+            <div id="table2" class="dynamic-table"></div>
+        </div>
     </div>
     <script>
-        function goToPage(pageNum) {
-            const queryString = window.location.search;
-            const urlParams = new URLSearchParams(queryString);
-            urlParams.set('page', pageNum);
-            window.location.search = urlParams.toString();
-        }
-    </script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const table1 = document.getElementById('table1');
+            const table2 = document.getElementById('table2');
+            let loading = false;
+
+            function loadMoreData() {
+                if (loading) return;
+                loading = true;
+
+                // Fetch data from the server
+                fetch(`/load-data?offset=${table1.children.length}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach((row, index) => {
+                            const table = index % 2 === 0 ? table1 : table2;
+                            const tr = document.createElement('tr');
+                            // Populate table rows
+                            table.appendChild(tr);
+                        });
+                        loading = false;
+                    });
+            }
+
+            // Infinite scroll logic
+            window.addEventListener('scroll', function() {
+                if (window.scrollY + window.innerHeight >= document.body.offsetHeight) {
+                    loadMoreData();
+                }
+            });
+
+            // Initial load
+            loadMore
+Data();
+});
+</script>
+
 </body>
 </html>
