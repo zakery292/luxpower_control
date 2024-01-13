@@ -80,8 +80,9 @@
 
         // Infinite scroll logic
         window.addEventListener('scroll', function() {
-            if (window.scrollY + window.innerHeight >= document.body.offsetHeight - 100) { // Trigger before reaching the bottom loadMoreData();
-}
+    if (window.scrollY + window.innerHeight >= document.body.offsetHeight - 100) {
+        loadMoreData();
+    }
 });
 // Variable to store the selected table name
 const selectedTableName = '{{ selected_table }}';
