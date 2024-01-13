@@ -22,50 +22,73 @@
                 {% endfor %}
                 <div class="table-info">
                     <p>Rows: {{ total_rows }}</p>
-                    <p>Last Updated: {{ last_updated }}</p> <!-- This will need backend support -->
+                    <p>Last Updated: {{ last_updated }}</p>
                 </div>
-            </aside>
+            </div>
+        </aside>
         <div class="table-container">
-            <div id="table1" class="dynamic-table"></div>
-            <div id="table2" class="dynamic-table"></div>
-        </div>
-    </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const table1 = document.getElementById('table1');
-            const table2 = document.getElementById('table2');
-            let loading = false;
-
-            function loadMoreData() {
-                if (loading) return;
-                loading = true;
-
-                // Fetch data from the server
-                fetch(`/load-data?offset=${table1.children.length}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        data.forEach((row, index) => {
-                            const table = index % 2 === 0 ? table1 : table2;
-                            const tr = document.createElement('tr');
-                            // Populate table rows
-                            table.appendChild(tr);
-                        });
-                        loading = false;
-                    });
+            <table id="dynamic-table">
+                <!-- Table headers will be dynamically populated -->
+                </table>
+                </div>
+                </div>
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                const table = document.getElementById('dynamic-table');
+                let loading = false;
+                let offset = 0;
+                function createTableHeaders(data) {
+            if (table.rows.length === 0) {
+                const headerRow = table.insertRow();
+                Object.keys(data[0]).forEach(key => {
+                    const th = document.createElement('th');
+                    th.textContent = key;
+                    headerRow.appendChild(th);
+                });
             }
+        }
 
-            // Infinite scroll logic
-            window.addEventListener('scroll', function() {
-                if (window.scrollY + window.innerHeight >= document.body.offsetHeight) {
-                    loadMoreData();
-                }
+        function populateTable(data) {
+            data.forEach(row => {
+                const tr = table.insertRow();
+                Object.values(row).forEach(value => {
+                    const td = tr.insertCell();
+                    td.textContent = value;
+                });
             });
+        }
 
-            // Initial load
-            loadMore
-Data();
+        function loadMoreData() {
+            if (loading) return;
+            loading = true;
+
+            // Fetch data from the server
+            fetch(`/load-more?table=${selectedTableName}&offset=${offset}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        createTableHeaders(data);
+                        populateTable(data);
+                        offset += data.length;
+                    }
+                    loading = false;
+                }).catch(error => {
+                    console.error('Error loading data:', error);
+                    loading = false;
+                });
+        }
+
+        // Infinite scroll logic
+        window.addEventListener('scroll', function() {
+            if (window.scrollY + window.innerHeight >= document.body.offsetHeight - 100) { // Trigger before reaching the bottom loadMoreData();
+}
+});
+// Variable to store the selected table name
+const selectedTableName = '{{ selected_table }}';
+
+// Initial load
+loadMoreData();
 });
 </script>
-
 </body>
 </html>
