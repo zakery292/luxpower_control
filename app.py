@@ -69,8 +69,7 @@ def load_more():
 
     if selected_table:
         # Fetch additional data based on offset
-        cursor.execute(f"SELECT
-        FROM {selected_table} LIMIT {limit} OFFSET {offset}")
+        cursor.execute(f"SELECT FROM {selected_table} LIMIT {limit} OFFSET {offset}")
         more_data = [dict(row) for row in cursor.fetchall()]
 
         cursor.close()
